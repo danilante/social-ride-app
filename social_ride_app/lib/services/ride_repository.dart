@@ -1,5 +1,16 @@
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:social_ride_app/models/rider_doc.dart';
+
+const _rideCodeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+String _generateRideCode() {
+  final random = Random.secure();
+  return List.generate(
+    6,
+    (_) => _rideCodeAlphabet[random.nextInt(_rideCodeAlphabet.length)],
+  ).join();
+}
 
 class RideNotFoundException implements Exception {
   final String rideId;
@@ -12,11 +23,20 @@ class RideNotFoundException implements Exception {
 class RideRepository {
   final FirebaseFirestore firestore;
   final String Function() currentUserId;
+  final String Function() codeGenerator;
 
-  RideRepository({required this.firestore, required this.currentUserId});
+  RideRepository({
+    required this.firestore,
+    required this.currentUserId,
+    String Function()? codeGenerator,
+  }) : codeGenerator = codeGenerator ?? _generateRideCode;
 
   Future<String> createRide(String rideName, String displayName) async {
-    final rideRef = firestore.collection('rides').doc();
+    late DocumentReference<Map<String, dynamic>> rideRef;
+    while (true) {
+      rideRef = firestore.collection('rides').doc(codeGenerator());
+      if (!(await rideRef.get()).exists) break;
+    }
     await rideRef.set({
       'name': rideName,
       'creatorId': currentUserId(),
@@ -28,12 +48,14 @@ class RideRepository {
     return rideRef.id;
   }
 
-  Future<void> joinRide(String rideId, String displayName) async {
-    final rideDoc = await firestore.collection('rides').doc(rideId).get();
+  Future<String> joinRide(String rideId, String displayName) async {
+    final normalizedId = rideId.toUpperCase();
+    final rideDoc = await firestore.collection('rides').doc(normalizedId).get();
     if (!rideDoc.exists) {
-      throw RideNotFoundException(rideId);
+      throw RideNotFoundException(normalizedId);
     }
-    await _addRider(rideId, displayName);
+    await _addRider(normalizedId, displayName);
+    return normalizedId;
   }
 
   Future<void> _addRider(String rideId, String displayName) {

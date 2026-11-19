@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:social_ride_app/models/rider_doc.dart';
 import 'package:social_ride_app/services/location_service.dart';
@@ -87,15 +88,48 @@ class _RideScreenState extends State<RideScreen> {
     }
   }
 
+  Future<void> _copyRideCode() async {
+    await Clipboard.setData(ClipboardData(text: widget.rideId));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Codice copiato')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Codice ride: ${widget.rideId}')),
+      appBar: AppBar(title: const Text('Ride in corso')),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(12),
-            child: _buildLocationControl(),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      widget.rideId,
+                      key: const Key('rideCodeText'),
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 4,
+                      ),
+                    ),
+                    IconButton(
+                      key: const Key('copyRideCodeButton'),
+                      icon: const Icon(Icons.copy),
+                      tooltip: 'Copia codice',
+                      onPressed: _copyRideCode,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _buildLocationControl(),
+              ],
+            ),
           ),
           Expanded(
             child: StreamBuilder<List<RiderDoc>>(

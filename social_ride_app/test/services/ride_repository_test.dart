@@ -50,6 +50,62 @@ void main() {
     expect(riderDoc.data()!['displayName'], 'Luca');
   });
 
+  test('createRide uses a short, easy to type/share ride code', () async {
+    final firestore = FakeFirebaseFirestore();
+    final repo = RideRepository(
+      firestore: firestore,
+      currentUserId: () => 'user1',
+    );
+
+    final rideId = await repo.createRide('Giro', 'Mario');
+
+    expect(rideId.length, 6);
+    expect(rideId, equals(rideId.toUpperCase()));
+    expect(RegExp(r'^[A-Z0-9]{6}$').hasMatch(rideId), isTrue);
+  });
+
+  test('createRide retries with a new code when one is already taken',
+      () async {
+    final firestore = FakeFirebaseFirestore();
+    var calls = 0;
+    final repo = RideRepository(
+      firestore: firestore,
+      currentUserId: () => 'user1',
+      codeGenerator: () {
+        calls++;
+        return calls == 1 ? 'ABC123' : 'XYZ999';
+      },
+    );
+    await firestore.collection('rides').doc('ABC123').set({'name': 'Taken'});
+
+    final rideId = await repo.createRide('Giro', 'Mario');
+
+    expect(rideId, 'XYZ999');
+  });
+
+  test('joinRide accepts a ride code regardless of letter case', () async {
+    final firestore = FakeFirebaseFirestore();
+    final creatorRepo = RideRepository(
+      firestore: firestore,
+      currentUserId: () => 'user1',
+    );
+    final rideId = await creatorRepo.createRide('Giro', 'Mario');
+
+    final joinerRepo = RideRepository(
+      firestore: firestore,
+      currentUserId: () => 'user2',
+    );
+    await joinerRepo.joinRide(rideId.toLowerCase(), 'Luca');
+
+    final riderDoc = await firestore
+        .collection('rides')
+        .doc(rideId)
+        .collection('riders')
+        .doc('user2')
+        .get();
+    expect(riderDoc.data()!['displayName'], 'Luca');
+  });
+
   test('joinRide throws RideNotFoundException for unknown ride', () async {
     final firestore = FakeFirebaseFirestore();
     final repo = RideRepository(

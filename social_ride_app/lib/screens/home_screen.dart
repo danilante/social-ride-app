@@ -27,8 +27,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _joinRide() async {
-    final rideId = _rideCodeController.text.trim();
-    await widget.rideRepository.joinRide(rideId, _nameController.text);
+    final rideId = await widget.rideRepository
+        .joinRide(_rideCodeController.text.trim(), _nameController.text);
     widget.onRideReady(rideId);
   }
 

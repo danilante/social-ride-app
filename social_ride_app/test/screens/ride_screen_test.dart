@@ -1,5 +1,6 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:social_ride_app/screens/ride_screen.dart';
@@ -30,6 +31,38 @@ void main() {
       rideRepository: repository,
     );
     rideId = await repository.createRide('Giro', 'Mario');
+  });
+
+  testWidgets('copy button puts the ride code on the clipboard',
+      (tester) async {
+    final locationService =
+        LocationService(checkPermission: () async => LocationPermission.denied);
+    String? copiedText;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copiedText = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      },
+    );
+    addTearDown(() => tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null));
+
+    await tester.pumpWidget(MaterialApp(
+      home: RideScreen(
+        rideId: rideId,
+        rideRepository: repository,
+        locationService: locationService,
+        pushService: pushService,
+      ),
+    ));
+
+    await tester.tap(find.byKey(const Key('copyRideCodeButton')));
+    await tester.pumpAndSettle();
+
+    expect(copiedText, rideId);
   });
 
   testWidgets('shows the ride code so it can be shared', (tester) async {
