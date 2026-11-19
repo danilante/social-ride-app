@@ -27,19 +27,26 @@ exports.onRiderPositionWritten = onDocumentWritten(
     const previousState = rider.state || 'in_group';
     const result = evaluateRider(rider, others, Date.now());
 
-    await db
-        .collection('rides')
-        .doc(rideId)
-        .collection('riders')
-        .doc(userId)
-        .set(
-          {
-            distanceFromGroupMeters: result.distanceFromGroupMeters,
-            thresholdExceededSince: result.thresholdExceededSince,
-            state: result.state,
-          },
-          { merge: true }
-        );
+    const unchanged =
+      result.state === previousState &&
+      result.distanceFromGroupMeters === rider.distanceFromGroupMeters &&
+      result.thresholdExceededSince === (rider.thresholdExceededSince ?? null);
+
+    if (!unchanged) {
+      await db
+          .collection('rides')
+          .doc(rideId)
+          .collection('riders')
+          .doc(userId)
+          .set(
+            {
+              distanceFromGroupMeters: result.distanceFromGroupMeters,
+              thresholdExceededSince: result.thresholdExceededSince,
+              state: result.state,
+            },
+            { merge: true }
+          );
+    }
 
     if (result.state !== previousState) {
       const tokens = others.map((r) => r.fcmToken).filter(Boolean);
