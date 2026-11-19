@@ -2,7 +2,7 @@
   "name": "functions",
   "version": "1.0.0",
   "description": "",
-  "main": "geo.js",
+  "main": "index.js",
   "scripts": {
     "test": "node --test"
   },
