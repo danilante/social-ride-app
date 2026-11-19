@@ -26,10 +26,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -58,5 +55,13 @@ class DefaultFirebaseOptions {
     messagingSenderId: '237255059500',
     projectId: 'social-ride-app-88892-2cfc5',
     storageBucket: 'social-ride-app-88892-2cfc5.firebasestorage.app',
+  );
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyCKeZ8WfGY6zBJlKdz2pdGD8SDj0AoR-zI',
+    appId: '1:237255059500:ios:ddffc2d1cc23b758008989',
+    messagingSenderId: '237255059500',
+    projectId: 'social-ride-app-88892-2cfc5',
+    storageBucket: 'social-ride-app-88892-2cfc5.firebasestorage.app',
+    iosBundleId: 'com.danielelanteri.socialRideApp',
   );
 }
