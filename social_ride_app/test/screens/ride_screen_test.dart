@@ -33,6 +33,33 @@ void main() {
     rideId = await repository.createRide('Giro', 'Mario');
   });
 
+  testWidgets('shows how many riders are in the ride and updates live',
+      (tester) async {
+    final locationService =
+        LocationService(checkPermission: () async => LocationPermission.denied);
+
+    await tester.pumpWidget(MaterialApp(
+      home: RideScreen(
+        rideId: rideId,
+        rideRepository: repository,
+        locationService: locationService,
+        pushService: pushService,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('1'), findsWidgets);
+    expect(find.text('Mario'), findsOneWidget);
+
+    final joinerRepo =
+        RideRepository(firestore: firestore, currentUserId: () => 'user2');
+    await joinerRepo.joinRide(rideId, 'Luca');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Luca'), findsOneWidget);
+    expect(find.textContaining('2'), findsWidgets);
+  });
+
   testWidgets('copy button puts the ride code on the clipboard',
       (tester) async {
     final locationService =

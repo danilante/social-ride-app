@@ -88,6 +88,28 @@ class _RideScreenState extends State<RideScreen> {
     }
   }
 
+  Widget _buildRidersSummary(List<RiderDoc> riders) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Column(
+        children: [
+          Text(
+            '${riders.length} in ride',
+            key: const Key('ridersCountText'),
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            children: riders
+                .map((r) => Chip(label: Text(r.displayName)))
+                .toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _copyRideCode() async {
     await Clipboard.setData(ClipboardData(text: widget.rideId));
     if (!mounted) return;
@@ -100,43 +122,45 @@ class _RideScreenState extends State<RideScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Ride in corso')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+      body: StreamBuilder<List<RiderDoc>>(
+        stream: widget.rideRepository.streamRiders(widget.rideId),
+        builder: (context, snapshot) {
+          final riders = snapshot.data ?? [];
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
                   children: [
-                    Text(
-                      widget.rideId,
-                      key: const Key('rideCodeText'),
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 4,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          widget.rideId,
+                          key: const Key('rideCodeText'),
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 4,
+                          ),
+                        ),
+                        IconButton(
+                          key: const Key('copyRideCodeButton'),
+                          icon: const Icon(Icons.copy),
+                          tooltip: 'Copia codice',
+                          onPressed: _copyRideCode,
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      key: const Key('copyRideCodeButton'),
-                      icon: const Icon(Icons.copy),
-                      tooltip: 'Copia codice',
-                      onPressed: _copyRideCode,
-                    ),
+                    const SizedBox(height: 8),
+                    _buildLocationControl(),
+                    const SizedBox(height: 8),
+                    _buildRidersSummary(riders),
                   ],
                 ),
-                const SizedBox(height: 8),
-                _buildLocationControl(),
-              ],
-            ),
-          ),
-          Expanded(
-            child: StreamBuilder<List<RiderDoc>>(
-              stream: widget.rideRepository.streamRiders(widget.rideId),
-              builder: (context, snapshot) {
-                final riders = snapshot.data ?? [];
-                return GoogleMap(
+              ),
+              Expanded(
+                child: GoogleMap(
                   initialCameraPosition: const CameraPosition(
                     target: LatLng(45.0703, 7.6869),
                     zoom: 12,
@@ -144,11 +168,11 @@ class _RideScreenState extends State<RideScreen> {
                   myLocationEnabled: true,
                   myLocationButtonEnabled: true,
                   markers: buildMarkers(riders),
-                );
-              },
-            ),
-          ),
-        ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
