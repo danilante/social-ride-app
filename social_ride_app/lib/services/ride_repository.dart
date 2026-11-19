@@ -20,6 +20,14 @@ class RideNotFoundException implements Exception {
   String toString() => 'Ride not found: $rideId';
 }
 
+class RideCodeCollisionException implements Exception {
+  final String rideId;
+  RideCodeCollisionException(this.rideId);
+
+  @override
+  String toString() => 'Ride code collision: $rideId';
+}
+
 class RideRepository {
   final FirebaseFirestore firestore;
   final String Function() currentUserId;
@@ -32,20 +40,28 @@ class RideRepository {
   }) : codeGenerator = codeGenerator ?? _generateRideCode;
 
   Future<String> createRide(String rideName, String displayName) async {
-    late DocumentReference<Map<String, dynamic>> rideRef;
     while (true) {
-      rideRef = firestore.collection('rides').doc(codeGenerator());
-      if (!(await rideRef.get()).exists) break;
+      final rideRef = firestore.collection('rides').doc(codeGenerator());
+      try {
+        await firestore.runTransaction((transaction) async {
+          final snapshot = await transaction.get(rideRef);
+          if (snapshot.exists) {
+            throw RideCodeCollisionException(rideRef.id);
+          }
+          transaction.set(rideRef, {
+            'name': rideName,
+            'creatorId': currentUserId(),
+            'status': 'active',
+            'createdAt': FieldValue.serverTimestamp(),
+            'dropoffThresholdMeters': 300,
+          });
+        });
+      } on RideCodeCollisionException {
+        continue;
+      }
+      await _addRider(rideRef.id, displayName);
+      return rideRef.id;
     }
-    await rideRef.set({
-      'name': rideName,
-      'creatorId': currentUserId(),
-      'status': 'active',
-      'createdAt': FieldValue.serverTimestamp(),
-      'dropoffThresholdMeters': 300,
-    });
-    await _addRider(rideRef.id, displayName);
-    return rideRef.id;
   }
 
   Future<String> joinRide(String rideId, String displayName) async {

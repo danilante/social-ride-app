@@ -6,16 +6,13 @@ const { evaluateRider } = require('./dropoff');
 
 initializeApp();
 
-exports.onRiderPositionWritten = onDocumentWritten(
-  'rides/{rideId}/riders/{userId}',
-  async (event) => {
-    const { rideId, userId } = event.params;
-    const db = getFirestore();
-    const ridersSnap = await db
-        .collection('rides')
-        .doc(rideId)
-        .collection('riders')
-        .get();
+async function handleRiderPositionWritten(db, messaging, rideId, userId) {
+    const rideRef = db.collection('rides').doc(rideId);
+    const [rideSnap, ridersSnap] = await Promise.all([
+      rideRef.get(),
+      rideRef.collection('riders').get(),
+    ]);
+    const thresholdMeters = rideSnap.data()?.dropoffThresholdMeters;
 
     const riders = ridersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     const rider = riders.find((r) => r.id === userId);
@@ -25,7 +22,9 @@ exports.onRiderPositionWritten = onDocumentWritten(
       (r) => r.id !== userId && r.lat != null && r.lng != null
     );
     const previousState = rider.state || 'in_group';
-    const result = evaluateRider(rider, others, Date.now());
+    const result = thresholdMeters != null
+      ? evaluateRider(rider, others, Date.now(), thresholdMeters)
+      : evaluateRider(rider, others, Date.now());
 
     const unchanged =
       result.state === previousState &&
@@ -59,11 +58,20 @@ exports.onRiderPositionWritten = onDocumentWritten(
           result.state === 'dropped_off'
             ? `~${Math.round(result.distanceFromGroupMeters)}m dal gruppo`
             : '';
-        await getMessaging().sendEachForMulticast({
+        await messaging.sendEachForMulticast({
           tokens,
           notification: { title, body },
         });
       }
     }
+}
+
+exports.handleRiderPositionWritten = handleRiderPositionWritten;
+
+exports.onRiderPositionWritten = onDocumentWritten(
+  'rides/{rideId}/riders/{userId}',
+  async (event) => {
+    const { rideId, userId } = event.params;
+    await handleRiderPositionWritten(getFirestore(), getMessaging(), rideId, userId);
   }
 );

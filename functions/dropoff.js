@@ -8,7 +8,12 @@ function evaluateRider(rider, otherRiders, now, thresholdMeters = DEFAULT_THRESH
     return { state: 'in_group', distanceFromGroupMeters: 0, thresholdExceededSince: null };
   }
 
-  const groupCenter = centroid(otherRiders.map((r) => ({ lat: r.lat, lng: r.lng })));
+  const inGroupRiders = otherRiders.filter((r) => r.state !== 'dropped_off');
+  if (inGroupRiders.length === 0) {
+    return { state: 'in_group', distanceFromGroupMeters: 0, thresholdExceededSince: null };
+  }
+
+  const groupCenter = centroid(inGroupRiders.map((r) => ({ lat: r.lat, lng: r.lng })));
   const distance = distanceMeters(rider.lat, rider.lng, groupCenter.lat, groupCenter.lng);
   const overThreshold = distance > thresholdMeters;
 

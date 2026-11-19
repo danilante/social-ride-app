@@ -81,6 +81,40 @@ void main() {
     final rideId = await repo.createRide('Giro', 'Mario');
 
     expect(rideId, 'XYZ999');
+
+    final takenDoc = await firestore.collection('rides').doc('ABC123').get();
+    expect(takenDoc.data()!['name'], 'Taken');
+  });
+
+  test(
+      'createRide does not clobber a ride another client just claimed with '
+      'the same generated code', () async {
+    final firestore = FakeFirebaseFirestore();
+    var calls = 0;
+    final repo = RideRepository(
+      firestore: firestore,
+      currentUserId: () => 'user1',
+      codeGenerator: () {
+        calls++;
+        if (calls == 1) {
+          // Simulate another client claiming this code just before this
+          // client's own create transaction runs.
+          firestore
+              .collection('rides')
+              .doc('ABC123')
+              .set({'name': 'ClaimedByOtherClient', 'creatorId': 'user2'});
+          return 'ABC123';
+        }
+        return 'XYZ999';
+      },
+    );
+
+    final rideId = await repo.createRide('Giro', 'Mario');
+
+    expect(rideId, 'XYZ999');
+    final claimedDoc = await firestore.collection('rides').doc('ABC123').get();
+    expect(claimedDoc.data()!['name'], 'ClaimedByOtherClient');
+    expect(claimedDoc.data()!['creatorId'], 'user2');
   });
 
   test('joinRide accepts a ride code regardless of letter case', () async {

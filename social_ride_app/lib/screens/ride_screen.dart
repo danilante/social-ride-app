@@ -111,8 +111,11 @@ class _RideScreenState extends State<RideScreen> {
   }
 
   Widget _buildDropoffAlert(List<RiderDoc> riders) {
-    final droppedOff =
-        riders.where((r) => r.state == RiderState.droppedOff).toList();
+    final currentUserId = widget.rideRepository.currentUserId();
+    final droppedOff = riders
+        .where((r) =>
+            r.state == RiderState.droppedOff && r.userId != currentUserId)
+        .toList();
     if (droppedOff.isEmpty) return const SizedBox.shrink();
     return Container(
       key: const Key('dropoffAlertBanner'),
