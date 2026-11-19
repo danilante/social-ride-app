@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "237255059500",
+    "project_id": "social-ride-app-88892-2cfc5",
+    "storage_bucket": "social-ride-app-88892-2cfc5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:237255059500:android:2978336c7f8e7b5a008989",
+        "android_client_info": {
+          "package_name": "com.danielelanteri.social_ride_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDy5e7FU2wF0C5UfY8HilVRLQ9fVN3-RXQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
