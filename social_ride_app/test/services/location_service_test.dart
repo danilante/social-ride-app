@@ -19,6 +19,35 @@ Position _fakePosition(DateTime timestamp, {double lat = 45.0, double lng = 7.0}
 }
 
 void main() {
+  test('ensurePermission returns true when permission already granted', () async {
+    final service = LocationService(
+      checkPermission: () async => LocationPermission.whileInUse,
+      requestPermission: () async => LocationPermission.denied,
+    );
+
+    expect(await service.ensurePermission(), isTrue);
+  });
+
+  test('ensurePermission requests permission when denied, then returns result',
+      () async {
+    final service = LocationService(
+      checkPermission: () async => LocationPermission.denied,
+      requestPermission: () async => LocationPermission.always,
+    );
+
+    expect(await service.ensurePermission(), isTrue);
+  });
+
+  test('ensurePermission returns false when permission denied forever',
+      () async {
+    final service = LocationService(
+      checkPermission: () async => LocationPermission.deniedForever,
+      requestPermission: () async => LocationPermission.deniedForever,
+    );
+
+    expect(await service.ensurePermission(), isFalse);
+  });
+
   test('throttledPositionStream only emits positions at least interval apart', () async {
     final controller = StreamController<Position>();
     final service = LocationService(

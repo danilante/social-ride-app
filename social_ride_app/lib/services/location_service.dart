@@ -2,15 +2,22 @@ import 'package:geolocator/geolocator.dart';
 
 class LocationService {
   final Stream<Position> Function() positionStreamFactory;
+  final Future<LocationPermission> Function() _checkPermission;
+  final Future<LocationPermission> Function() _requestPermission;
 
-  LocationService({Stream<Position> Function()? positionStreamFactory})
-      : positionStreamFactory =
-            positionStreamFactory ?? Geolocator.getPositionStream;
+  LocationService({
+    Stream<Position> Function()? positionStreamFactory,
+    Future<LocationPermission> Function()? checkPermission,
+    Future<LocationPermission> Function()? requestPermission,
+  })  : positionStreamFactory =
+            positionStreamFactory ?? Geolocator.getPositionStream,
+        _checkPermission = checkPermission ?? Geolocator.checkPermission,
+        _requestPermission = requestPermission ?? Geolocator.requestPermission;
 
   Future<bool> ensurePermission() async {
-    LocationPermission permission = await Geolocator.checkPermission();
+    LocationPermission permission = await _checkPermission();
     if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      permission = await _requestPermission();
     }
     return permission == LocationPermission.always ||
         permission == LocationPermission.whileInUse;

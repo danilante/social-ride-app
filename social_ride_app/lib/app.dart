@@ -8,34 +8,55 @@ import 'package:social_ride_app/services/ride_repository.dart';
 
 class SocialRideApp extends StatefulWidget {
   final RideRepository rideRepository;
+  final LocationService Function()? locationServiceFactory;
+  final PushService Function(RideRepository rideRepository)? pushServiceFactory;
 
-  const SocialRideApp({super.key, required this.rideRepository});
+  const SocialRideApp({
+    super.key,
+    required this.rideRepository,
+    this.locationServiceFactory,
+    this.pushServiceFactory,
+  });
 
   @override
   State<SocialRideApp> createState() => _SocialRideAppState();
 }
 
 class _SocialRideAppState extends State<SocialRideApp> {
-  String? _activeRideId;
+  final _navigatorKey = GlobalKey<NavigatorState>();
+
+  LocationService _buildLocationService() =>
+      widget.locationServiceFactory?.call() ?? LocationService();
+
+  PushService _buildPushService() =>
+      widget.pushServiceFactory?.call(widget.rideRepository) ??
+      PushService(
+        tokenProvider:
+            FirebaseMessagingTokenProvider(FirebaseMessaging.instance),
+        rideRepository: widget.rideRepository,
+      );
+
+  void _openRide(String rideId) {
+    _navigatorKey.currentState!.push(
+      MaterialPageRoute(
+        builder: (_) => RideScreen(
+          rideId: rideId,
+          rideRepository: widget.rideRepository,
+          locationService: _buildLocationService(),
+          pushService: _buildPushService(),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: _activeRideId == null
-          ? HomeScreen(
-              rideRepository: widget.rideRepository,
-              onRideReady: (rideId) => setState(() => _activeRideId = rideId),
-            )
-          : RideScreen(
-              rideId: _activeRideId!,
-              rideRepository: widget.rideRepository,
-              locationService: LocationService(),
-              pushService: PushService(
-                tokenProvider:
-                    FirebaseMessagingTokenProvider(FirebaseMessaging.instance),
-                rideRepository: widget.rideRepository,
-              ),
-            ),
+      navigatorKey: _navigatorKey,
+      home: HomeScreen(
+        rideRepository: widget.rideRepository,
+        onRideReady: _openRide,
+      ),
     );
   }
 }

@@ -25,19 +25,27 @@ class RideScreen extends StatefulWidget {
   State<RideScreen> createState() => _RideScreenState();
 }
 
+enum _LocationStatus { idle, requesting, sharing, denied }
+
 class _RideScreenState extends State<RideScreen> {
   StreamSubscription? _positionSubscription;
+  _LocationStatus _status = _LocationStatus.idle;
 
   @override
   void initState() {
     super.initState();
     widget.pushService.registerForRide(widget.rideId);
-    _startSharingPosition();
   }
 
   Future<void> _startSharingPosition() async {
+    setState(() => _status = _LocationStatus.requesting);
     final granted = await widget.locationService.ensurePermission();
-    if (!granted) return;
+    if (!mounted) return;
+    if (!granted) {
+      setState(() => _status = _LocationStatus.denied);
+      return;
+    }
+    setState(() => _status = _LocationStatus.sharing);
     _positionSubscription =
         widget.locationService.throttledPositionStream().listen((position) {
       widget.rideRepository
@@ -51,22 +59,62 @@ class _RideScreenState extends State<RideScreen> {
     super.dispose();
   }
 
+  Widget _buildLocationControl() {
+    switch (_status) {
+      case _LocationStatus.idle:
+        return ElevatedButton(
+          key: const Key('startRideButton'),
+          onPressed: _startSharingPosition,
+          child: const Text('Avvia ride'),
+        );
+      case _LocationStatus.requesting:
+        return const CircularProgressIndicator();
+      case _LocationStatus.sharing:
+        return const Text('Condivisione posizione attiva');
+      case _LocationStatus.denied:
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Permesso posizione negato'),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              key: const Key('retryLocationButton'),
+              onPressed: _startSharingPosition,
+              child: const Text('Riprova'),
+            ),
+          ],
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Ride in corso')),
-      body: StreamBuilder<List<RiderDoc>>(
-        stream: widget.rideRepository.streamRiders(widget.rideId),
-        builder: (context, snapshot) {
-          final riders = snapshot.data ?? [];
-          return GoogleMap(
-            initialCameraPosition: const CameraPosition(
-              target: LatLng(45.0703, 7.6869),
-              zoom: 12,
+      appBar: AppBar(title: Text('Codice ride: ${widget.rideId}')),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: _buildLocationControl(),
+          ),
+          Expanded(
+            child: StreamBuilder<List<RiderDoc>>(
+              stream: widget.rideRepository.streamRiders(widget.rideId),
+              builder: (context, snapshot) {
+                final riders = snapshot.data ?? [];
+                return GoogleMap(
+                  initialCameraPosition: const CameraPosition(
+                    target: LatLng(45.0703, 7.6869),
+                    zoom: 12,
+                  ),
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: true,
+                  markers: buildMarkers(riders),
+                );
+              },
             ),
-            markers: buildMarkers(riders),
-          );
-        },
+          ),
+        ],
       ),
     );
   }
