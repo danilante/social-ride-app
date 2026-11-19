@@ -110,6 +110,34 @@ class _RideScreenState extends State<RideScreen> {
     );
   }
 
+  Widget _buildDropoffAlert(List<RiderDoc> riders) {
+    final droppedOff =
+        riders.where((r) => r.state == RiderState.droppedOff).toList();
+    if (droppedOff.isEmpty) return const SizedBox.shrink();
+    return Container(
+      key: const Key('dropoffAlertBanner'),
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.red.shade100,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: droppedOff
+            .map((r) => Text(
+                  '⚠️ ${r.displayName} staccato'
+                  '${r.distanceFromGroupMeters != null ? " ~${r.distanceFromGroupMeters!.round()}m" : ""}',
+                  style: const TextStyle(
+                      color: Colors.red, fontWeight: FontWeight.bold),
+                ))
+            .toList(),
+      ),
+    );
+  }
+
   Future<void> _copyRideCode() async {
     await Clipboard.setData(ClipboardData(text: widget.rideId));
     if (!mounted) return;
@@ -159,6 +187,7 @@ class _RideScreenState extends State<RideScreen> {
                   ],
                 ),
               ),
+              _buildDropoffAlert(riders),
               Expanded(
                 child: GoogleMap(
                   initialCameraPosition: const CameraPosition(

@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -58,6 +59,53 @@ void main() {
 
     expect(find.text('Luca'), findsOneWidget);
     expect(find.textContaining('2'), findsWidgets);
+  });
+
+  testWidgets('shows a banner when a rider drops off, hides it when back',
+      (tester) async {
+    final locationService =
+        LocationService(checkPermission: () async => LocationPermission.denied);
+
+    await tester.pumpWidget(MaterialApp(
+      home: RideScreen(
+        rideId: rideId,
+        rideRepository: repository,
+        locationService: locationService,
+        pushService: pushService,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('dropoffAlertBanner')), findsNothing);
+
+    await firestore
+        .collection('rides')
+        .doc(rideId)
+        .collection('riders')
+        .doc('user2')
+        .set({
+      'displayName': 'Luca',
+      'state': 'dropped_off',
+      'distanceFromGroupMeters': 350.0,
+    });
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('dropoffAlertBanner')), findsOneWidget);
+    expect(find.textContaining('Luca'), findsWidgets);
+    expect(find.textContaining('350'), findsWidgets);
+
+    await firestore
+        .collection('rides')
+        .doc(rideId)
+        .collection('riders')
+        .doc('user2')
+        .set({
+      'displayName': 'Luca',
+      'state': 'in_group',
+    }, SetOptions(merge: true));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('dropoffAlertBanner')), findsNothing);
   });
 
   testWidgets('copy button puts the ride code on the clipboard',
