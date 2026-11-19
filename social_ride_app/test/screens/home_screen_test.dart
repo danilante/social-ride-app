@@ -102,4 +102,28 @@ void main() {
     expect(readyRideId, isNull);
     expect(find.textContaining('nome'), findsWidgets);
   });
+
+  testWidgets('joining with a nonexistent ride code shows an error and stays on home',
+      (tester) async {
+    final firestore = FakeFirebaseFirestore();
+    final repository =
+        RideRepository(firestore: firestore, currentUserId: () => 'user1');
+    String? readyRideId;
+
+    await tester.pumpWidget(MaterialApp(
+      home: HomeScreen(
+        rideRepository: repository,
+        onRideReady: (id) => readyRideId = id,
+      ),
+    ));
+
+    await tester.enterText(find.byKey(const Key('displayNameField')), 'Mario');
+    await tester.enterText(find.byKey(const Key('rideCodeField')), 'ZZZZZZ');
+    await tester.tap(find.byKey(const Key('joinRideButton')));
+    await tester.pumpAndSettle();
+
+    expect(readyRideId, isNull);
+    expect(find.byType(HomeScreen), findsOneWidget);
+    expect(find.textContaining('non trovat'), findsWidgets);
+  });
 }

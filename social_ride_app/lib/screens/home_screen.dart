@@ -37,9 +37,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _joinRide() async {
     if (!_requireName()) return;
-    final rideId = await widget.rideRepository.joinRide(
-        _rideCodeController.text.trim(), _nameController.text.trim());
-    widget.onRideReady(rideId);
+    try {
+      final rideId = await widget.rideRepository.joinRide(
+          _rideCodeController.text.trim(), _nameController.text.trim());
+      widget.onRideReady(rideId);
+    } on RideNotFoundException {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ride non trovata, controlla il codice')),
+      );
+    }
   }
 
   @override
