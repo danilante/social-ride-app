@@ -26,10 +26,15 @@ class PushService {
   PushService({required this.tokenProvider, required this.rideRepository});
 
   Future<void> registerForRide(String rideId) async {
-    await tokenProvider.requestPermission();
-    final token = await tokenProvider.getToken();
-    if (token != null) {
-      await rideRepository.updateFcmToken(rideId, token);
+    try {
+      await tokenProvider.requestPermission();
+      final token = await tokenProvider.getToken();
+      if (token != null) {
+        await rideRepository.updateFcmToken(rideId, token);
+      }
+    } catch (_) {
+      // Push registration is best-effort: a missing/unavailable token
+      // (e.g. no APNS token on simulators) shouldn't break the ride flow.
     }
   }
 }
