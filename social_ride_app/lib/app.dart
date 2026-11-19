@@ -1,7 +1,9 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:social_ride_app/screens/home_screen.dart';
 import 'package:social_ride_app/screens/ride_screen.dart';
 import 'package:social_ride_app/services/location_service.dart';
+import 'package:social_ride_app/services/push_service.dart';
 import 'package:social_ride_app/services/ride_repository.dart';
 
 class SocialRideApp extends StatefulWidget {
@@ -28,6 +30,11 @@ class _SocialRideAppState extends State<SocialRideApp> {
               rideId: _activeRideId!,
               rideRepository: widget.rideRepository,
               locationService: LocationService(),
+              pushService: PushService(
+                tokenProvider:
+                    FirebaseMessagingTokenProvider(FirebaseMessaging.instance),
+                rideRepository: widget.rideRepository,
+              ),
             ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:social_ride_app/models/rider_doc.dart';
 import 'package:social_ride_app/services/location_service.dart';
+import 'package:social_ride_app/services/push_service.dart';
 import 'package:social_ride_app/services/ride_repository.dart';
 import 'package:social_ride_app/util/markers.dart';
 
@@ -10,12 +11,14 @@ class RideScreen extends StatefulWidget {
   final String rideId;
   final RideRepository rideRepository;
   final LocationService locationService;
+  final PushService pushService;
 
   const RideScreen({
     super.key,
     required this.rideId,
     required this.rideRepository,
     required this.locationService,
+    required this.pushService,
   });
 
   @override
@@ -28,6 +31,7 @@ class _RideScreenState extends State<RideScreen> {
   @override
   void initState() {
     super.initState();
+    widget.pushService.registerForRide(widget.rideId);
     _startSharingPosition();
   }
 
