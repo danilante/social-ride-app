@@ -54,4 +54,52 @@ void main() {
 
     expect(readyRideId, rideId);
   });
+
+  testWidgets('joining without a name is blocked and shows an error',
+      (tester) async {
+    final firestore = FakeFirebaseFirestore();
+    final creatorRepo =
+        RideRepository(firestore: firestore, currentUserId: () => 'user1');
+    final rideId = await creatorRepo.createRide('Giro', 'Mario');
+
+    final joinerRepo =
+        RideRepository(firestore: firestore, currentUserId: () => 'user2');
+    String? readyRideId;
+
+    await tester.pumpWidget(MaterialApp(
+      home: HomeScreen(
+        rideRepository: joinerRepo,
+        onRideReady: (id) => readyRideId = id,
+      ),
+    ));
+
+    await tester.enterText(find.byKey(const Key('rideCodeField')), rideId);
+    await tester.tap(find.byKey(const Key('joinRideButton')));
+    await tester.pumpAndSettle();
+
+    expect(readyRideId, isNull);
+    expect(find.textContaining('nome'), findsWidgets);
+  });
+
+  testWidgets('creating without a name is blocked and shows an error',
+      (tester) async {
+    final firestore = FakeFirebaseFirestore();
+    final repository =
+        RideRepository(firestore: firestore, currentUserId: () => 'user1');
+    String? readyRideId;
+
+    await tester.pumpWidget(MaterialApp(
+      home: HomeScreen(
+        rideRepository: repository,
+        onRideReady: (rideId) => readyRideId = rideId,
+      ),
+    ));
+
+    await tester.enterText(find.byKey(const Key('rideNameField')), 'Giro');
+    await tester.tap(find.byKey(const Key('createRideButton')));
+    await tester.pumpAndSettle();
+
+    expect(readyRideId, isNull);
+    expect(find.textContaining('nome'), findsWidgets);
+  });
 }

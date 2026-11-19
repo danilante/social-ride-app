@@ -20,15 +20,25 @@ class _HomeScreenState extends State<HomeScreen> {
   final _rideNameController = TextEditingController();
   final _rideCodeController = TextEditingController();
 
+  bool _requireName() {
+    if (_nameController.text.trim().isNotEmpty) return true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Inserisci il tuo nome')),
+    );
+    return false;
+  }
+
   Future<void> _createRide() async {
+    if (!_requireName()) return;
     final rideId = await widget.rideRepository
-        .createRide(_rideNameController.text, _nameController.text);
+        .createRide(_rideNameController.text, _nameController.text.trim());
     widget.onRideReady(rideId);
   }
 
   Future<void> _joinRide() async {
-    final rideId = await widget.rideRepository
-        .joinRide(_rideCodeController.text.trim(), _nameController.text);
+    if (!_requireName()) return;
+    final rideId = await widget.rideRepository.joinRide(
+        _rideCodeController.text.trim(), _nameController.text.trim());
     widget.onRideReady(rideId);
   }
 
