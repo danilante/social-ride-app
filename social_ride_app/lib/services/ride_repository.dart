@@ -108,6 +108,15 @@ class RideRepository {
         .set({'fcmToken': token}, SetOptions(merge: true));
   }
 
+  Future<void> updateDropoffAudioUrl(String rideId, String? audioUrl) {
+    return firestore
+        .collection('rides')
+        .doc(rideId)
+        .collection('riders')
+        .doc(currentUserId())
+        .set({'dropoffAudioUrl': audioUrl}, SetOptions(merge: true));
+  }
+
   Stream<List<RiderDoc>> streamRiders(String rideId) {
     return firestore
         .collection('rides')

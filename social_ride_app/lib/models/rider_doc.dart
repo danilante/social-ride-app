@@ -17,6 +17,7 @@ class RiderDoc {
   final DateTime? positionUpdatedAt;
   final RiderState state;
   final double? distanceFromGroupMeters;
+  final String? dropoffAudioUrl;
 
   RiderDoc({
     required this.userId,
@@ -26,6 +27,7 @@ class RiderDoc {
     this.positionUpdatedAt,
     this.state = RiderState.inGroup,
     this.distanceFromGroupMeters,
+    this.dropoffAudioUrl,
   });
 
   factory RiderDoc.fromMap(String userId, Map<String, dynamic> data) {
@@ -43,6 +45,7 @@ class RiderDoc {
       state: riderStateFromString(data['state'] as String? ?? 'in_group'),
       distanceFromGroupMeters:
           (data['distanceFromGroupMeters'] as num?)?.toDouble(),
+      dropoffAudioUrl: data['dropoffAudioUrl'] as String?,
     );
   }
 }

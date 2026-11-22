@@ -27,6 +27,46 @@ void main() {
     expect(riderDoc.data()!['state'], 'in_group');
   });
 
+  test('updateDropoffAudioUrl stores the audio URL on the rider doc',
+      () async {
+    final firestore = FakeFirebaseFirestore();
+    final repo = RideRepository(
+      firestore: firestore,
+      currentUserId: () => 'user1',
+    );
+    final rideId = await repo.createRide('Giro', 'Mario');
+
+    await repo.updateDropoffAudioUrl(rideId, 'https://example.com/a.m4a');
+
+    final riderDoc = await firestore
+        .collection('rides')
+        .doc(rideId)
+        .collection('riders')
+        .doc('user1')
+        .get();
+    expect(riderDoc.data()!['dropoffAudioUrl'], 'https://example.com/a.m4a');
+  });
+
+  test('updateDropoffAudioUrl with null clears the audio URL', () async {
+    final firestore = FakeFirebaseFirestore();
+    final repo = RideRepository(
+      firestore: firestore,
+      currentUserId: () => 'user1',
+    );
+    final rideId = await repo.createRide('Giro', 'Mario');
+    await repo.updateDropoffAudioUrl(rideId, 'https://example.com/a.m4a');
+
+    await repo.updateDropoffAudioUrl(rideId, null);
+
+    final riderDoc = await firestore
+        .collection('rides')
+        .doc(rideId)
+        .collection('riders')
+        .doc('user1')
+        .get();
+    expect(riderDoc.data()!['dropoffAudioUrl'], isNull);
+  });
+
   test('joinRide adds a second rider to an existing ride', () async {
     final firestore = FakeFirebaseFirestore();
     final creatorRepo = RideRepository(

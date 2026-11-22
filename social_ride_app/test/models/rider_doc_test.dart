@@ -29,4 +29,17 @@ void main() {
     expect(rider.lat, isNull);
     expect(rider.positionUpdatedAt, isNull);
   });
+
+  test('RiderDoc.fromMap parses dropoffAudioUrl when present', () {
+    final rider = RiderDoc.fromMap('user1', {
+      'displayName': 'Mario',
+      'dropoffAudioUrl': 'https://example.com/audio.m4a',
+    });
+    expect(rider.dropoffAudioUrl, 'https://example.com/audio.m4a');
+  });
+
+  test('RiderDoc.fromMap defaults dropoffAudioUrl to null when missing', () {
+    final rider = RiderDoc.fromMap('user1', {'displayName': 'Mario'});
+    expect(rider.dropoffAudioUrl, isNull);
+  });
 }

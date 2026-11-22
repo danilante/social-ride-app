@@ -1,8 +1,13 @@
 import 'dart:async';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:social_ride_app/models/rider_doc.dart';
+import 'package:social_ride_app/services/audio_duration_reader.dart';
+import 'package:social_ride_app/services/dropoff_audio_service.dart';
+import 'package:social_ride_app/services/dropoff_recorder.dart';
 import 'package:social_ride_app/services/location_service.dart';
 import 'package:social_ride_app/services/push_service.dart';
 import 'package:social_ride_app/services/ride_repository.dart';
@@ -14,6 +19,8 @@ class RideScreen extends StatefulWidget {
   final RideRepository rideRepository;
   final LocationService locationService;
   final PushService pushService;
+  final DropoffAudioService? dropoffAudioService;
+  final DropoffRecorder? recorder;
 
   const RideScreen({
     super.key,
@@ -21,6 +28,8 @@ class RideScreen extends StatefulWidget {
     required this.rideRepository,
     required this.locationService,
     required this.pushService,
+    this.dropoffAudioService,
+    this.recorder,
   });
 
   @override
@@ -32,6 +41,21 @@ enum _LocationStatus { idle, requesting, sharing, denied }
 class _RideScreenState extends State<RideScreen> {
   StreamSubscription? _positionSubscription;
   _LocationStatus _status = _LocationStatus.idle;
+  DropoffAudioService? _audioServiceCache;
+  DropoffRecorder? _recorderCache;
+  final _alertPlayer = AudioPlayer();
+  final Set<String> _playedDropoffAlertFor = {};
+  bool _isRecording = false;
+
+  DropoffAudioService get _audioService =>
+      widget.dropoffAudioService ??
+      (_audioServiceCache ??= DropoffAudioService(
+        rideRepository: widget.rideRepository,
+        durationReader: JustAudioDurationReader(),
+      ));
+
+  DropoffRecorder get _recorder =>
+      widget.recorder ?? (_recorderCache ??= DropoffRecorder());
 
   @override
   void initState() {
@@ -58,7 +82,150 @@ class _RideScreenState extends State<RideScreen> {
   @override
   void dispose() {
     _positionSubscription?.cancel();
+    _alertPlayer.dispose();
+    _recorderCache?.dispose();
     super.dispose();
+  }
+
+  void _maybePlayDropoffAlerts(List<RiderDoc> riders) {
+    final currentUserId = widget.rideRepository.currentUserId();
+    for (final r in riders) {
+      if (r.state != RiderState.droppedOff) {
+        _playedDropoffAlertFor.remove(r.userId);
+        continue;
+      }
+      if (r.userId == currentUserId) continue;
+      if (r.dropoffAudioUrl == null) continue;
+      if (!_playedDropoffAlertFor.add(r.userId)) continue;
+      _alertPlayer.setUrl(r.dropoffAudioUrl!).then((_) => _alertPlayer.play());
+    }
+  }
+
+  Future<void> _pickAudioFile() async {
+    final file = await FilePicker.pickFile(type: FileType.audio);
+    final path = file?.path;
+    if (path == null) return;
+    await _applyDropoffAudio(path);
+  }
+
+  Future<void> _toggleRecording() async {
+    if (_isRecording) {
+      setState(() => _isRecording = false);
+      final path = await _recorder.stop();
+      if (path != null) await _applyDropoffAudio(path);
+      return;
+    }
+    final granted = await _recorder.hasPermission();
+    if (!granted) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Permesso microfono negato')),
+      );
+      return;
+    }
+    await _recorder.start();
+    setState(() => _isRecording = true);
+    Future.delayed(dropoffAudioMaxDuration, () async {
+      if (!mounted || !_isRecording) return;
+      setState(() => _isRecording = false);
+      final path = await _recorder.stop();
+      if (path != null) await _applyDropoffAudio(path);
+    });
+  }
+
+  Future<void> _applyDropoffAudio(String filePath) async {
+    try {
+      await _audioService.setDropoffAudio(widget.rideId, filePath);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Audio allontanamento impostato')),
+      );
+    } on DropoffAudioTooLongException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Audio troppo lungo: massimo 6 secondi')),
+      );
+    }
+  }
+
+  Future<void> _removeDropoffAudio() async {
+    await _audioService.clearDropoffAudio(widget.rideId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Audio allontanamento rimosso')),
+    );
+  }
+
+  void _openDropoffAudioSheet(String? currentAudioUrl) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.graphic_eq_rounded, color: socialRideOrange),
+                  SizedBox(width: 8),
+                  Text('Il tuo audio allontanamento',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Verrà riprodotto sul telefono degli altri quando ti stacchi '
+                'dal gruppo. Max 6 secondi.',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                key: const Key('recordDropoffAudioButton'),
+                onPressed: () async {
+                  await _toggleRecording();
+                  setSheetState(() {});
+                },
+                icon: Icon(_isRecording
+                    ? Icons.stop_circle_rounded
+                    : Icons.mic_rounded),
+                label: Text(_isRecording
+                    ? 'Stop registrazione'
+                    : 'Registra in app'),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                key: const Key('uploadDropoffAudioButton'),
+                onPressed: () async {
+                  await _pickAudioFile();
+                  if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                },
+                icon: const Icon(Icons.upload_file_rounded),
+                label: const Text('Carica un file'),
+              ),
+              if (currentAudioUrl != null) ...[
+                const SizedBox(height: 10),
+                TextButton.icon(
+                  key: const Key('removeDropoffAudioButton'),
+                  onPressed: () async {
+                    await _removeDropoffAudio();
+                    if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                  },
+                  icon: const Icon(Icons.delete_outline_rounded,
+                      color: Colors.redAccent),
+                  label: const Text('Rimuovi audio',
+                      style: TextStyle(color: Colors.redAccent)),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildLocationControl() {
@@ -218,11 +385,35 @@ class _RideScreenState extends State<RideScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Ride in corso')),
+      appBar: AppBar(
+        title: const Text('Ride in corso'),
+        actions: [
+          StreamBuilder<List<RiderDoc>>(
+            stream: widget.rideRepository.streamRiders(widget.rideId),
+            builder: (context, snapshot) {
+              final me = (snapshot.data ?? []).where(
+                  (r) => r.userId == widget.rideRepository.currentUserId());
+              final myAudioUrl =
+                  me.isEmpty ? null : me.first.dropoffAudioUrl;
+              return IconButton(
+                key: const Key('dropoffAudioSettingsButton'),
+                icon: Icon(
+                  myAudioUrl != null
+                      ? Icons.graphic_eq_rounded
+                      : Icons.mic_none_rounded,
+                ),
+                tooltip: 'Audio allontanamento',
+                onPressed: () => _openDropoffAudioSheet(myAudioUrl),
+              );
+            },
+          ),
+        ],
+      ),
       body: StreamBuilder<List<RiderDoc>>(
         stream: widget.rideRepository.streamRiders(widget.rideId),
         builder: (context, snapshot) {
           final riders = snapshot.data ?? [];
+          _maybePlayDropoffAlerts(riders);
           return Column(
             children: [
               Container(

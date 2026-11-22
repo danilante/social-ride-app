@@ -61,6 +61,12 @@ async function handleRiderPositionWritten(db, messaging, rideId, userId) {
         await messaging.sendEachForMulticast({
           tokens,
           notification: { title, body },
+          data: {
+            riderId: userId,
+            state: result.state,
+            dropoffAudioUrl:
+              result.state === 'dropped_off' ? rider.dropoffAudioUrl || '' : '',
+          },
         });
       }
     }

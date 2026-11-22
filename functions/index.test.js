@@ -105,3 +105,55 @@ test('stays in_group when distance is under the custom threshold', async () => {
   assert.strictEqual(writes[0].data.state, 'in_group');
   assert.strictEqual(sent.length, 0);
 });
+
+test('includes the dropped-off rider\'s custom audio URL in the push payload',
+  async () => {
+    const now = Date.now();
+    const writes = [];
+    const sent = [];
+    const db = fakeDb({
+      ride: { dropoffThresholdMeters: 50 },
+      riders: {
+        me: {
+          lat: 0.0009,
+          lng: 0,
+          state: 'in_group',
+          thresholdExceededSince: now - 61000,
+          displayName: 'Mario',
+          dropoffAudioUrl: 'https://example.com/mario.m4a',
+        },
+        other1: { lat: 0, lng: 0, state: 'in_group', fcmToken: 'tok1' },
+      },
+      writes,
+    });
+
+    await handleRiderPositionWritten(db, fakeMessaging(sent), 'ride1', 'me');
+
+    assert.strictEqual(sent.length, 1);
+    assert.strictEqual(sent[0].data.dropoffAudioUrl, 'https://example.com/mario.m4a');
+  });
+
+test('sends an empty dropoffAudioUrl when the dropped-off rider has none set',
+  async () => {
+    const now = Date.now();
+    const writes = [];
+    const sent = [];
+    const db = fakeDb({
+      ride: { dropoffThresholdMeters: 50 },
+      riders: {
+        me: {
+          lat: 0.0009,
+          lng: 0,
+          state: 'in_group',
+          thresholdExceededSince: now - 61000,
+          displayName: 'Mario',
+        },
+        other1: { lat: 0, lng: 0, state: 'in_group', fcmToken: 'tok1' },
+      },
+      writes,
+    });
+
+    await handleRiderPositionWritten(db, fakeMessaging(sent), 'ride1', 'me');
+
+    assert.strictEqual(sent[0].data.dropoffAudioUrl, '');
+  });
