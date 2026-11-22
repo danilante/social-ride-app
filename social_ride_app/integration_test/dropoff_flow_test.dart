@@ -3,6 +3,11 @@
 // not fakes, on a real device/simulator. Requires:
 //   firebase emulators:start --only firestore,auth,functions
 // before `flutter test integration_test/dropoff_flow_test.dart -d <device>`.
+// On a physical device (not Simulator), the emulators must also bind to
+// 0.0.0.0 (see firebase.json) and 'localhost' below must be replaced with
+// the Mac's LAN IP, since the phone can't reach the Mac's loopback address.
+// (Verified working end-to-end on a physical iPhone on 2026-11-23 — the
+// Simulator-only gRPC/Firestore hang does not reproduce on real hardware.)
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -40,8 +45,8 @@ void main() {
 
   setUpAll(() async {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-    FirebaseFirestore.instance.useFirestoreEmulator('127.0.0.1', 8080);
-    await FirebaseAuth.instance.useAuthEmulator('127.0.0.1', 9099);
+    FirebaseFirestore.instance.useFirestoreEmulator('192.168.1.13', 8080);
+    await FirebaseAuth.instance.useAuthEmulator('192.168.1.13', 9099);
   });
 
   testWidgets(

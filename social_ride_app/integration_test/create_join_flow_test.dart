@@ -1,6 +1,9 @@
 // Real end-to-end check of the create/join UI flows against the actual
 // Firebase emulators. Requires:
 //   firebase emulators:start --only firestore,auth,functions
+// On a physical device (not Simulator), the emulators must also bind to
+// 0.0.0.0 (see firebase.json) and 'localhost' below must be replaced with
+// the Mac's LAN IP, since the phone can't reach the Mac's loopback address.
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';

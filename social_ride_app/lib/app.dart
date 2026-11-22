@@ -5,6 +5,7 @@ import 'package:social_ride_app/screens/ride_screen.dart';
 import 'package:social_ride_app/services/location_service.dart';
 import 'package:social_ride_app/services/push_service.dart';
 import 'package:social_ride_app/services/ride_repository.dart';
+import 'package:social_ride_app/theme.dart';
 
 class SocialRideApp extends StatefulWidget {
   final RideRepository rideRepository;
@@ -53,6 +54,7 @@ class _SocialRideAppState extends State<SocialRideApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: _navigatorKey,
+      theme: buildSocialRideTheme(),
       home: HomeScreen(
         rideRepository: widget.rideRepository,
         onRideReady: _openRide,

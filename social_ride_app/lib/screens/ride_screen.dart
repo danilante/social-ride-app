@@ -6,6 +6,7 @@ import 'package:social_ride_app/models/rider_doc.dart';
 import 'package:social_ride_app/services/location_service.dart';
 import 'package:social_ride_app/services/push_service.dart';
 import 'package:social_ride_app/services/ride_repository.dart';
+import 'package:social_ride_app/theme.dart';
 import 'package:social_ride_app/util/markers.dart';
 
 class RideScreen extends StatefulWidget {
@@ -63,22 +64,59 @@ class _RideScreenState extends State<RideScreen> {
   Widget _buildLocationControl() {
     switch (_status) {
       case _LocationStatus.idle:
-        return ElevatedButton(
+        return ElevatedButton.icon(
           key: const Key('startRideButton'),
           onPressed: _startSharingPosition,
-          child: const Text('Avvia ride'),
+          icon: const Icon(Icons.play_arrow_rounded),
+          label: const Text('Avvia ride'),
         );
       case _LocationStatus.requesting:
-        return const CircularProgressIndicator();
+        return const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2.5),
+          ),
+        );
       case _LocationStatus.sharing:
-        return const Text('Condivisione posizione attiva');
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8F6EC),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.location_on_rounded, color: Color(0xFF2E9E53), size: 18),
+              SizedBox(width: 6),
+              Text(
+                'Condivisione posizione attiva',
+                style: TextStyle(
+                  color: Color(0xFF1F7A3F),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        );
       case _LocationStatus.denied:
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Permesso posizione negato'),
-            const SizedBox(height: 8),
-            ElevatedButton(
+            const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.location_off_rounded, color: Colors.redAccent, size: 18),
+                SizedBox(width: 6),
+                Text('Permesso posizione negato',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton(
               key: const Key('retryLocationButton'),
               onPressed: _startSharingPosition,
               child: const Text('Riprova'),
@@ -89,24 +127,40 @@ class _RideScreenState extends State<RideScreen> {
   }
 
   Widget _buildRidersSummary(List<RiderDoc> riders) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Column(
-        children: [
-          Text(
-            '${riders.length} in ride',
-            key: const Key('ridersCountText'),
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 8,
-            children: riders
-                .map((r) => Chip(label: Text(r.displayName)))
-                .toList(),
-          ),
-        ],
-      ),
+    return Column(
+      children: [
+        Text(
+          '${riders.length} in ride',
+          key: const Key('ridersCountText'),
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 8,
+          runSpacing: 4,
+          children: riders
+              .map((r) => Chip(
+                    avatar: CircleAvatar(
+                      radius: 11,
+                      backgroundColor: r.state == RiderState.droppedOff
+                          ? Colors.redAccent
+                          : socialRideOrange,
+                      child: Text(
+                        r.displayName.isNotEmpty
+                            ? r.displayName[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    label: Text(r.displayName),
+                  ))
+              .toList(),
+        ),
+      ],
     );
   }
 
@@ -120,23 +174,35 @@ class _RideScreenState extends State<RideScreen> {
     return Container(
       key: const Key('dropoffAlertBanner'),
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.red.shade100,
-        borderRadius: BorderRadius.circular(8),
+        color: const Color(0xFFFFE9E4),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFFC7B8)),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: droppedOff
-            .map((r) => Text(
-                  '⚠️ ${r.displayName} staccato'
-                  '${r.distanceFromGroupMeters != null ? " ~${r.distanceFromGroupMeters!.round()}m" : ""}',
-                  style: const TextStyle(
-                      color: Colors.red, fontWeight: FontWeight.bold),
-                ))
-            .toList(),
+        children: [
+          const Icon(Icons.warning_rounded, color: Color(0xFFD9461E)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: droppedOff
+                  .map((r) => Text(
+                        '${r.displayName} si è staccato dal gruppo'
+                        '${r.distanceFromGroupMeters != null ? " (~${r.distanceFromGroupMeters!.round()}m)" : ""}',
+                        style: const TextStyle(
+                          color: Color(0xFFD9461E),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ))
+                  .toList(),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -159,8 +225,16 @@ class _RideScreenState extends State<RideScreen> {
           final riders = snapshot.data ?? [];
           return Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+                decoration: const BoxDecoration(
+                  color: socialRideInk,
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(24),
+                  ),
+                ),
                 child: Column(
                   children: [
                     Row(
@@ -171,35 +245,54 @@ class _RideScreenState extends State<RideScreen> {
                           key: const Key('rideCodeText'),
                           style: const TextStyle(
                             fontSize: 28,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w800,
                             letterSpacing: 4,
+                            color: Colors.white,
                           ),
                         ),
                         IconButton(
                           key: const Key('copyRideCodeButton'),
-                          icon: const Icon(Icons.copy),
+                          icon: const Icon(Icons.copy_rounded,
+                              color: socialRideOrange),
                           tooltip: 'Copia codice',
                           onPressed: _copyRideCode,
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     _buildLocationControl(),
-                    const SizedBox(height: 8),
-                    _buildRidersSummary(riders),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: DefaultTextStyle.merge(
+                        style: const TextStyle(color: Colors.white),
+                        child: _buildRidersSummary(riders),
+                      ),
+                    ),
                   ],
                 ),
               ),
+              const SizedBox(height: 12),
               _buildDropoffAlert(riders),
               Expanded(
-                child: GoogleMap(
-                  initialCameraPosition: const CameraPosition(
-                    target: LatLng(45.0703, 7.6869),
-                    zoom: 12,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(0),
                   ),
-                  myLocationEnabled: true,
-                  myLocationButtonEnabled: true,
-                  markers: buildMarkers(riders),
+                  child: GoogleMap(
+                    initialCameraPosition: const CameraPosition(
+                      target: LatLng(45.0703, 7.6869),
+                      zoom: 12,
+                    ),
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: true,
+                    markers: buildMarkers(riders),
+                  ),
                 ),
               ),
             ],
