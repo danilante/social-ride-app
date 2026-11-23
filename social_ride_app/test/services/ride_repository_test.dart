@@ -180,6 +180,38 @@ void main() {
     expect(riderDoc.data()!['displayName'], 'Luca');
   });
 
+  test('createRide sets default dropoff settings', () async {
+    final firestore = FakeFirebaseFirestore();
+    final repo = RideRepository(
+      firestore: firestore,
+      currentUserId: () => 'user1',
+    );
+    final rideId = await repo.createRide('Giro', 'Mario');
+
+    final ride = await repo.streamRide(rideId).first;
+    expect(ride.dropoffThresholdMeters, 300);
+    expect(ride.dropoffDwellSeconds, 60);
+  });
+
+  test('updateDropoffSettings overrides the ride dropoff settings', () async {
+    final firestore = FakeFirebaseFirestore();
+    final repo = RideRepository(
+      firestore: firestore,
+      currentUserId: () => 'user1',
+    );
+    final rideId = await repo.createRide('Giro', 'Mario');
+
+    await repo.updateDropoffSettings(
+      rideId,
+      dropoffThresholdMeters: 150,
+      dropoffDwellSeconds: 30,
+    );
+
+    final ride = await repo.streamRide(rideId).first;
+    expect(ride.dropoffThresholdMeters, 150);
+    expect(ride.dropoffDwellSeconds, 30);
+  });
+
   test('joinRide throws RideNotFoundException for unknown ride', () async {
     final firestore = FakeFirebaseFirestore();
     final repo = RideRepository(

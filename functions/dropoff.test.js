@@ -25,6 +25,14 @@ test('does not mark dropped_off before dwell time elapses', () => {
   assert.strictEqual(result.state, 'in_group');
 });
 
+test('respects a custom dwellMs', () => {
+  const now = Date.now();
+  const rider = { lat: 10, lng: 10, thresholdExceededSince: now - 6000 };
+  const others = [{ lat: 0, lng: 0 }];
+  const result = evaluateRider(rider, others, now, 300, 5000);
+  assert.strictEqual(result.state, 'dropped_off');
+});
+
 test('resets exceededSince when back under threshold', () => {
   const rider = { lat: 0, lng: 0.0001, thresholdExceededSince: Date.now() - 70000 };
   const others = [{ lat: 0, lng: 0 }];

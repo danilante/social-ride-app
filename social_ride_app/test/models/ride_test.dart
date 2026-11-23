@@ -22,4 +22,18 @@ void main() {
     final ride = Ride.fromMap('ride1', {'name': 'X', 'creatorId': 'u'});
     expect(ride.dropoffThresholdMeters, 300);
   });
+
+  test('Ride.fromMap defaults dropoffDwellSeconds to 60', () {
+    final ride = Ride.fromMap('ride1', {'name': 'X', 'creatorId': 'u'});
+    expect(ride.dropoffDwellSeconds, 60);
+  });
+
+  test('Ride.fromMap parses a custom dropoffDwellSeconds', () {
+    final ride = Ride.fromMap('ride1', {
+      'name': 'X',
+      'creatorId': 'u',
+      'dropoffDwellSeconds': 30,
+    });
+    expect(ride.dropoffDwellSeconds, 30);
+  });
 }

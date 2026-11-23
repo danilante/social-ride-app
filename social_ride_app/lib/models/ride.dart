@@ -5,6 +5,7 @@ class Ride {
   final String creatorId;
   final String status;
   final double dropoffThresholdMeters;
+  final int dropoffDwellSeconds;
 
   Ride({
     required this.id,
@@ -12,6 +13,7 @@ class Ride {
     required this.creatorId,
     required this.status,
     required this.dropoffThresholdMeters,
+    required this.dropoffDwellSeconds,
   });
 
   factory Ride.fromMap(String id, Map<String, dynamic> data) {
@@ -22,6 +24,7 @@ class Ride {
       status: data['status'] as String? ?? 'active',
       dropoffThresholdMeters:
           (data['dropoffThresholdMeters'] as num?)?.toDouble() ?? 300,
+      dropoffDwellSeconds: (data['dropoffDwellSeconds'] as num?)?.toInt() ?? 60,
     );
   }
 }

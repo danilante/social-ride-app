@@ -133,6 +133,30 @@ test('includes the dropped-off rider\'s custom audio URL in the push payload',
     assert.strictEqual(sent[0].data.dropoffAudioUrl, 'https://example.com/mario.m4a');
   });
 
+test('respects a custom dropoffDwellSeconds from the ride settings', async () => {
+  const now = Date.now();
+  const writes = [];
+  const sent = [];
+  const db = fakeDb({
+    ride: { dropoffThresholdMeters: 50, dropoffDwellSeconds: 5 },
+    riders: {
+      me: {
+        lat: 0.0009,
+        lng: 0,
+        state: 'in_group',
+        thresholdExceededSince: now - 6000,
+        displayName: 'Mario',
+      },
+      other1: { lat: 0, lng: 0, state: 'in_group', fcmToken: 'tok1' },
+    },
+    writes,
+  });
+
+  await handleRiderPositionWritten(db, fakeMessaging(sent), 'ride1', 'me');
+
+  assert.strictEqual(writes[0].data.state, 'dropped_off');
+});
+
 test('sends an empty dropoffAudioUrl when the dropped-off rider has none set',
   async () => {
     const now = Date.now();

@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:social_ride_app/models/ride.dart';
 import 'package:social_ride_app/models/rider_doc.dart';
 
 const _rideCodeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -54,6 +55,7 @@ class RideRepository {
             'status': 'active',
             'createdAt': FieldValue.serverTimestamp(),
             'dropoffThresholdMeters': 300,
+            'dropoffDwellSeconds': 60,
           });
         });
       } on RideCodeCollisionException {
@@ -115,6 +117,25 @@ class RideRepository {
         .collection('riders')
         .doc(currentUserId())
         .set({'dropoffAudioUrl': audioUrl}, SetOptions(merge: true));
+  }
+
+  Stream<Ride> streamRide(String rideId) {
+    return firestore
+        .collection('rides')
+        .doc(rideId)
+        .snapshots()
+        .map((snap) => Ride.fromMap(snap.id, snap.data() ?? {}));
+  }
+
+  Future<void> updateDropoffSettings(
+    String rideId, {
+    required double dropoffThresholdMeters,
+    required int dropoffDwellSeconds,
+  }) {
+    return firestore.collection('rides').doc(rideId).set({
+      'dropoffThresholdMeters': dropoffThresholdMeters,
+      'dropoffDwellSeconds': dropoffDwellSeconds,
+    }, SetOptions(merge: true));
   }
 
   Stream<List<RiderDoc>> streamRiders(String rideId) {

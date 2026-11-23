@@ -3,7 +3,13 @@ const { distanceMeters, centroid } = require('./geo');
 const DEFAULT_THRESHOLD_METERS = 300;
 const DWELL_MS = 60 * 1000;
 
-function evaluateRider(rider, otherRiders, now, thresholdMeters = DEFAULT_THRESHOLD_METERS) {
+function evaluateRider(
+  rider,
+  otherRiders,
+  now,
+  thresholdMeters = DEFAULT_THRESHOLD_METERS,
+  dwellMs = DWELL_MS
+) {
   if (otherRiders.length === 0) {
     return { state: 'in_group', distanceFromGroupMeters: 0, thresholdExceededSince: null };
   }
@@ -24,7 +30,7 @@ function evaluateRider(rider, otherRiders, now, thresholdMeters = DEFAULT_THRESH
     exceededSince = now;
   }
 
-  const droppedOff = overThreshold && exceededSince && now - exceededSince >= DWELL_MS;
+  const droppedOff = overThreshold && exceededSince && now - exceededSince >= dwellMs;
 
   return {
     state: droppedOff ? 'dropped_off' : 'in_group',

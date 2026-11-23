@@ -13,6 +13,7 @@ async function handleRiderPositionWritten(db, messaging, rideId, userId) {
       rideRef.collection('riders').get(),
     ]);
     const thresholdMeters = rideSnap.data()?.dropoffThresholdMeters;
+    const dwellSeconds = rideSnap.data()?.dropoffDwellSeconds;
 
     const riders = ridersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     const rider = riders.find((r) => r.id === userId);
@@ -22,9 +23,13 @@ async function handleRiderPositionWritten(db, messaging, rideId, userId) {
       (r) => r.id !== userId && r.lat != null && r.lng != null
     );
     const previousState = rider.state || 'in_group';
-    const result = thresholdMeters != null
-      ? evaluateRider(rider, others, Date.now(), thresholdMeters)
-      : evaluateRider(rider, others, Date.now());
+    const args = [rider, others, Date.now()];
+    if (thresholdMeters != null) args.push(thresholdMeters);
+    if (dwellSeconds != null) {
+      if (args.length === 3) args.push(undefined);
+      args.push(dwellSeconds * 1000);
+    }
+    const result = evaluateRider(...args);
 
     const unchanged =
       result.state === previousState &&

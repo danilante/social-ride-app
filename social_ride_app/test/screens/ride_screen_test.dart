@@ -108,6 +108,59 @@ void main() {
     expect(find.byKey(const Key('dropoffAlertBanner')), findsNothing);
   });
 
+  testWidgets('ride creator can open settings and save a custom dropoff threshold',
+      (tester) async {
+    final locationService =
+        LocationService(checkPermission: () async => LocationPermission.denied);
+
+    await tester.pumpWidget(MaterialApp(
+      home: RideScreen(
+        rideId: rideId,
+        rideRepository: repository,
+        locationService: locationService,
+        pushService: pushService,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('rideSettingsButton')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('rideSettingsButton')));
+    await tester.pumpAndSettle();
+
+    final slider =
+        tester.widget<Slider>(find.byKey(const Key('dropoffThresholdSlider')));
+    slider.onChanged!(150);
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('saveRideSettingsButton')));
+    await tester.pumpAndSettle();
+
+    final rideDoc = await firestore.collection('rides').doc(rideId).get();
+    expect(rideDoc.data()!['dropoffThresholdMeters'], lessThan(300));
+  });
+
+  testWidgets('a non-creator does not see the ride settings button',
+      (tester) async {
+    final joinerRepo =
+        RideRepository(firestore: firestore, currentUserId: () => 'user2');
+    await joinerRepo.joinRide(rideId, 'Luca');
+    final locationService =
+        LocationService(checkPermission: () async => LocationPermission.denied);
+
+    await tester.pumpWidget(MaterialApp(
+      home: RideScreen(
+        rideId: rideId,
+        rideRepository: joinerRepo,
+        locationService: locationService,
+        pushService: pushService,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('rideSettingsButton')), findsNothing);
+  });
+
   testWidgets('copy button puts the ride code on the clipboard',
       (tester) async {
     final locationService =
