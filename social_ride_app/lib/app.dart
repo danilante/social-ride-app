@@ -2,10 +2,12 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:social_ride_app/screens/home_screen.dart';
 import 'package:social_ride_app/screens/ride_screen.dart';
+import 'package:social_ride_app/services/audio_alert_session.dart';
 import 'package:social_ride_app/services/location_service.dart';
 import 'package:social_ride_app/services/push_service.dart';
 import 'package:social_ride_app/services/recent_ride_store.dart';
 import 'package:social_ride_app/services/ride_repository.dart';
+import 'package:social_ride_app/services/volume_notice_store.dart';
 import 'package:social_ride_app/theme.dart';
 
 class SocialRideApp extends StatefulWidget {
@@ -13,6 +15,8 @@ class SocialRideApp extends StatefulWidget {
   final LocationService Function()? locationServiceFactory;
   final PushService Function(RideRepository rideRepository)? pushServiceFactory;
   final RecentRideStore? recentRideStore;
+  final AudioAlertSession? audioAlertSession;
+  final VolumeNoticeStore? volumeNoticeStore;
 
   const SocialRideApp({
     super.key,
@@ -20,6 +24,8 @@ class SocialRideApp extends StatefulWidget {
     this.locationServiceFactory,
     this.pushServiceFactory,
     this.recentRideStore,
+    this.audioAlertSession,
+    this.volumeNoticeStore,
   });
 
   @override
@@ -28,6 +34,46 @@ class SocialRideApp extends StatefulWidget {
 
 class _SocialRideAppState extends State<SocialRideApp> {
   final _navigatorKey = GlobalKey<NavigatorState>();
+
+  AudioAlertSession get _audioAlertSession =>
+      widget.audioAlertSession ?? DeviceAudioAlertSession();
+
+  VolumeNoticeStore get _volumeNoticeStore =>
+      widget.volumeNoticeStore ?? SharedPreferencesVolumeNoticeStore();
+
+  @override
+  void initState() {
+    super.initState();
+    _audioAlertSession.configureForAlerts();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowVolumeNotice());
+  }
+
+  Future<void> _maybeShowVolumeNotice() async {
+    if (await _volumeNoticeStore.hasSeenNotice()) return;
+    final context = _navigatorKey.currentContext;
+    if (context == null || !context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('volumeNoticeDialog'),
+        title: const Text('Avvisi sonori anche a telefono silenzioso'),
+        content: const Text(
+          'Quando un rider si stacca dal gruppo, l\'app riproduce un avviso '
+          'sonoro anche se hai attivato la modalità silenziosa, così lo senti '
+          'pure con il telefono in tasca.',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('volumeNoticeAcceptButton'),
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Ho capito'),
+          ),
+        ],
+      ),
+    );
+    await _volumeNoticeStore.markNoticeSeen();
+  }
 
   LocationService _buildLocationService() =>
       widget.locationServiceFactory?.call() ?? LocationService();
