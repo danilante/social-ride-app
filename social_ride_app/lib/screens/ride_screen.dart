@@ -325,6 +325,7 @@ class _RideScreenState extends State<RideScreen>
             children: [
               IconButton(
                 key: const Key('playRecordingPreviewButton'),
+                tooltip: _isPreviewPlaying ? 'Pausa' : 'Riproduci',
                 icon: Icon(
                   _isPreviewPlaying
                       ? Icons.pause_circle_filled_rounded
@@ -477,7 +478,14 @@ class _RideScreenState extends State<RideScreen>
           );
         },
       ),
-    ).whenComplete(() => _sheetRefresh = null);
+    ).whenComplete(() {
+      _sheetRefresh = null;
+      if (_isRecording) {
+        unawaited(_stopRecording().then((_) => _discardRecording()));
+      } else if (_pendingRecordingPath != null) {
+        unawaited(_discardRecording());
+      }
+    });
   }
 
   Widget _buildLocationControl() {
