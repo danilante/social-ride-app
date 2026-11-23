@@ -4,6 +4,7 @@ import 'package:social_ride_app/screens/home_screen.dart';
 import 'package:social_ride_app/screens/ride_screen.dart';
 import 'package:social_ride_app/services/location_service.dart';
 import 'package:social_ride_app/services/push_service.dart';
+import 'package:social_ride_app/services/recent_ride_store.dart';
 import 'package:social_ride_app/services/ride_repository.dart';
 import 'package:social_ride_app/theme.dart';
 
@@ -11,12 +12,14 @@ class SocialRideApp extends StatefulWidget {
   final RideRepository rideRepository;
   final LocationService Function()? locationServiceFactory;
   final PushService Function(RideRepository rideRepository)? pushServiceFactory;
+  final RecentRideStore? recentRideStore;
 
   const SocialRideApp({
     super.key,
     required this.rideRepository,
     this.locationServiceFactory,
     this.pushServiceFactory,
+    this.recentRideStore,
   });
 
   @override
@@ -58,6 +61,7 @@ class _SocialRideAppState extends State<SocialRideApp> {
       home: HomeScreen(
         rideRepository: widget.rideRepository,
         onRideReady: _openRide,
+        recentRideStore: widget.recentRideStore,
       ),
     );
   }

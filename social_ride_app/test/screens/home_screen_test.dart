@@ -2,7 +2,18 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:social_ride_app/screens/home_screen.dart';
+import 'package:social_ride_app/services/recent_ride_store.dart';
 import 'package:social_ride_app/services/ride_repository.dart';
+
+class _FakeRecentRideStore implements RecentRideStore {
+  RecentRide? _ride;
+
+  @override
+  Future<void> save(RecentRide ride) async => _ride = ride;
+
+  @override
+  Future<RecentRide?> load() async => _ride;
+}
 
 void main() {
   testWidgets('creating a ride writes it to Firestore and calls onRideReady',
@@ -16,6 +27,7 @@ void main() {
       home: HomeScreen(
         rideRepository: repository,
         onRideReady: (rideId) => readyRideId = rideId,
+        recentRideStore: _FakeRecentRideStore(),
       ),
     ));
 
@@ -44,6 +56,7 @@ void main() {
       home: HomeScreen(
         rideRepository: joinerRepo,
         onRideReady: (id) => readyRideId = id,
+        recentRideStore: _FakeRecentRideStore(),
       ),
     ));
 
@@ -70,6 +83,7 @@ void main() {
       home: HomeScreen(
         rideRepository: joinerRepo,
         onRideReady: (id) => readyRideId = id,
+        recentRideStore: _FakeRecentRideStore(),
       ),
     ));
 
@@ -92,6 +106,7 @@ void main() {
       home: HomeScreen(
         rideRepository: repository,
         onRideReady: (rideId) => readyRideId = rideId,
+        recentRideStore: _FakeRecentRideStore(),
       ),
     ));
 
@@ -101,6 +116,58 @@ void main() {
 
     expect(readyRideId, isNull);
     expect(find.textContaining('nome'), findsWidgets);
+  });
+
+  testWidgets('creating a ride saves it as the recent ride', (tester) async {
+    final firestore = FakeFirebaseFirestore();
+    final repository =
+        RideRepository(firestore: firestore, currentUserId: () => 'user1');
+    final store = _FakeRecentRideStore();
+    String? readyRideId;
+
+    await tester.pumpWidget(MaterialApp(
+      home: HomeScreen(
+        rideRepository: repository,
+        onRideReady: (rideId) => readyRideId = rideId,
+        recentRideStore: store,
+      ),
+    ));
+
+    await tester.enterText(find.byKey(const Key('displayNameField')), 'Mario');
+    await tester.enterText(find.byKey(const Key('rideNameField')), 'Giro');
+    await tester.tap(find.byKey(const Key('createRideButton')));
+    await tester.pumpAndSettle();
+
+    final saved = await store.load();
+    expect(saved?.rideId, readyRideId);
+    expect(saved?.displayName, 'Mario');
+  });
+
+  testWidgets('shows a shortcut back into a recent ride and continuing skips the form',
+      (tester) async {
+    final firestore = FakeFirebaseFirestore();
+    final repository =
+        RideRepository(firestore: firestore, currentUserId: () => 'user1');
+    final rideId = await repository.createRide('Giro', 'Mario');
+    final store = _FakeRecentRideStore();
+    await store.save(RecentRide(rideId: rideId, displayName: 'Mario'));
+    String? readyRideId;
+
+    await tester.pumpWidget(MaterialApp(
+      home: HomeScreen(
+        rideRepository: repository,
+        onRideReady: (id) => readyRideId = id,
+        recentRideStore: store,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('recentRideCard')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('continueRecentRideButton')));
+    await tester.pumpAndSettle();
+
+    expect(readyRideId, rideId);
   });
 
   testWidgets('joining with a nonexistent ride code shows an error and stays on home',
@@ -114,6 +181,7 @@ void main() {
       home: HomeScreen(
         rideRepository: repository,
         onRideReady: (id) => readyRideId = id,
+        recentRideStore: _FakeRecentRideStore(),
       ),
     ));
 

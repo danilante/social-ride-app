@@ -7,6 +7,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:social_ride_app/models/ride.dart';
 import 'package:social_ride_app/models/rider_doc.dart';
 import 'package:social_ride_app/services/audio_duration_reader.dart';
+import 'package:social_ride_app/services/dropoff_alert_speaker.dart';
 import 'package:social_ride_app/services/dropoff_audio_service.dart';
 import 'package:social_ride_app/services/dropoff_recorder.dart';
 import 'package:social_ride_app/services/location_service.dart';
@@ -22,6 +23,7 @@ class RideScreen extends StatefulWidget {
   final PushService pushService;
   final DropoffAudioService? dropoffAudioService;
   final DropoffRecorder? recorder;
+  final DropoffAlertSpeaker? alertSpeaker;
 
   const RideScreen({
     super.key,
@@ -31,6 +33,7 @@ class RideScreen extends StatefulWidget {
     required this.pushService,
     this.dropoffAudioService,
     this.recorder,
+    this.alertSpeaker,
   });
 
   @override
@@ -45,6 +48,7 @@ class _RideScreenState extends State<RideScreen>
   _LocationStatus _status = _LocationStatus.idle;
   DropoffAudioService? _audioServiceCache;
   DropoffRecorder? _recorderCache;
+  DropoffAlertSpeaker? _alertSpeakerCache;
   final _alertPlayer = AudioPlayer();
   final _previewPlayer = AudioPlayer();
   final Set<String> _playedDropoffAlertFor = {};
@@ -71,6 +75,10 @@ class _RideScreenState extends State<RideScreen>
 
   DropoffRecorder get _recorder =>
       widget.recorder ?? (_recorderCache ??= DropoffRecorder());
+
+  DropoffAlertSpeaker get _alertSpeaker =>
+      widget.alertSpeaker ??
+      (_alertSpeakerCache ??= FlutterTtsDropoffAlertSpeaker());
 
   @override
   void initState() {
@@ -137,9 +145,9 @@ class _RideScreenState extends State<RideScreen>
       if (r.dropoffAudioUrl != null) {
         _alertPlayer.setUrl(r.dropoffAudioUrl!).then((_) => _alertPlayer.play());
       } else {
-        // Rider never recorded a personal clip: play a default alert so a
+        // Rider never recorded a personal clip: speak a default alert so a
         // drop-off is never silent.
-        SystemSound.play(SystemSoundType.alert);
+        _alertSpeaker.speak('Il rider ${r.displayName} si è staccato dal gruppo.');
       }
     }
   }
@@ -400,7 +408,7 @@ class _RideScreenState extends State<RideScreen>
     );
   }
 
-  void _openDropoffAudioSheet(String? currentAudioUrl) {
+  void _openDropoffAudioSheet(String? currentAudioUrl, String myDisplayName) {
     setState(() {
       _pendingRecordingPath = null;
       _isPreviewPlaying = false;
@@ -433,6 +441,31 @@ class _RideScreenState extends State<RideScreen>
                   'Verrà riprodotto sul telefono degli altri quando ti stacchi '
                   'dal gruppo. Max 6 secondi.',
                   style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  key: const Key('defaultAudioNotice'),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F3F5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded,
+                          color: Colors.grey.shade600, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Se non registri nulla, verrà usato un messaggio '
+                          'vocale automatico: "Il rider $myDisplayName si è '
+                          'staccato dal gruppo".',
+                          style: TextStyle(
+                              color: Colors.grey.shade600, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 16),
                 if (_isRecording) ...[
@@ -747,6 +780,7 @@ class _RideScreenState extends State<RideScreen>
     final currentUserId = widget.rideRepository.currentUserId();
     final me = riders.where((r) => r.userId == currentUserId);
     final myAudioUrl = me.isEmpty ? null : me.first.dropoffAudioUrl;
+    final myDisplayName = me.isEmpty ? '' : me.first.displayName;
     final hasAudio = myAudioUrl != null;
     return Container(
       key: const Key('dropoffAudioCard'),
@@ -789,7 +823,7 @@ class _RideScreenState extends State<RideScreen>
           const SizedBox(width: 8),
           TextButton(
             key: const Key('dropoffAudioSettingsButton'),
-            onPressed: () => _openDropoffAudioSheet(myAudioUrl),
+            onPressed: () => _openDropoffAudioSheet(myAudioUrl, myDisplayName),
             child: Text(hasAudio ? 'Modifica' : 'Registra'),
           ),
         ],

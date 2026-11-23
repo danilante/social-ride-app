@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:social_ride_app/screens/ride_screen.dart';
+import 'package:social_ride_app/services/dropoff_alert_speaker.dart';
 import 'package:social_ride_app/services/location_service.dart';
 import 'package:social_ride_app/services/push_service.dart';
 import 'package:social_ride_app/services/ride_repository.dart';
@@ -17,11 +18,21 @@ class _FakeTokenProvider implements PushTokenProvider {
   Future<String?> getToken() async => null;
 }
 
+class _FakeDropoffAlertSpeaker implements DropoffAlertSpeaker {
+  final List<String> spoken = [];
+
+  @override
+  Future<void> speak(String text) async {
+    spoken.add(text);
+  }
+}
+
 void main() {
   late FakeFirebaseFirestore firestore;
   late RideRepository repository;
   late PushService pushService;
   late String rideId;
+  late _FakeDropoffAlertSpeaker alertSpeaker;
 
   setUp(() async {
     firestore = FakeFirebaseFirestore();
@@ -32,6 +43,7 @@ void main() {
       rideRepository: repository,
     );
     rideId = await repository.createRide('Giro', 'Mario');
+    alertSpeaker = _FakeDropoffAlertSpeaker();
   });
 
   testWidgets('shows how many riders are in the ride and updates live',
@@ -45,6 +57,7 @@ void main() {
         rideRepository: repository,
         locationService: locationService,
         pushService: pushService,
+        alertSpeaker: alertSpeaker,
       ),
     ));
     await tester.pumpAndSettle();
@@ -72,6 +85,7 @@ void main() {
         rideRepository: repository,
         locationService: locationService,
         pushService: pushService,
+        alertSpeaker: alertSpeaker,
       ),
     ));
     await tester.pumpAndSettle();
@@ -93,6 +107,7 @@ void main() {
     expect(find.byKey(const Key('dropoffAlertBanner')), findsOneWidget);
     expect(find.textContaining('Luca'), findsWidgets);
     expect(find.textContaining('350'), findsWidgets);
+    expect(alertSpeaker.spoken, ['Il rider Luca si è staccato dal gruppo.']);
 
     await firestore
         .collection('rides')
@@ -119,6 +134,7 @@ void main() {
         rideRepository: repository,
         locationService: locationService,
         pushService: pushService,
+        alertSpeaker: alertSpeaker,
       ),
     ));
     await tester.pumpAndSettle();
@@ -154,11 +170,38 @@ void main() {
         rideRepository: joinerRepo,
         locationService: locationService,
         pushService: pushService,
+        alertSpeaker: alertSpeaker,
       ),
     ));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('rideSettingsButton')), findsNothing);
+  });
+
+  testWidgets(
+      'the record sheet tells the rider what default message plays if they skip recording',
+      (tester) async {
+    final locationService =
+        LocationService(checkPermission: () async => LocationPermission.denied);
+
+    await tester.pumpWidget(MaterialApp(
+      home: RideScreen(
+        rideId: rideId,
+        rideRepository: repository,
+        locationService: locationService,
+        pushService: pushService,
+        alertSpeaker: alertSpeaker,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('dropoffAudioSettingsButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('defaultAudioNotice')), findsOneWidget);
+    expect(
+        find.textContaining('Il rider Mario si è staccato dal gruppo'),
+        findsOneWidget);
   });
 
   testWidgets('copy button puts the ride code on the clipboard',
@@ -184,6 +227,7 @@ void main() {
         rideRepository: repository,
         locationService: locationService,
         pushService: pushService,
+        alertSpeaker: alertSpeaker,
       ),
     ));
 
@@ -203,6 +247,7 @@ void main() {
         rideRepository: repository,
         locationService: locationService,
         pushService: pushService,
+        alertSpeaker: alertSpeaker,
       ),
     ));
 
@@ -222,6 +267,7 @@ void main() {
         rideRepository: repository,
         locationService: locationService,
         pushService: pushService,
+        alertSpeaker: alertSpeaker,
       ),
     ));
 
@@ -245,6 +291,7 @@ void main() {
         rideRepository: repository,
         locationService: locationService,
         pushService: pushService,
+        alertSpeaker: alertSpeaker,
       ),
     ));
 

@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:social_ride_app/app.dart';
 import 'package:social_ride_app/services/location_service.dart';
 import 'package:social_ride_app/services/push_service.dart';
+import 'package:social_ride_app/services/recent_ride_store.dart';
 import 'package:social_ride_app/services/ride_repository.dart';
 
 class _FakeTokenProvider implements PushTokenProvider {
@@ -13,6 +14,16 @@ class _FakeTokenProvider implements PushTokenProvider {
 
   @override
   Future<String?> getToken() async => null;
+}
+
+class _FakeRecentRideStore implements RecentRideStore {
+  RecentRide? _ride;
+
+  @override
+  Future<void> save(RecentRide ride) async => _ride = ride;
+
+  @override
+  Future<RecentRide?> load() async => _ride;
 }
 
 void main() {
@@ -30,6 +41,7 @@ void main() {
         tokenProvider: _FakeTokenProvider(),
         rideRepository: rideRepository,
       ),
+      recentRideStore: _FakeRecentRideStore(),
     ));
 
     await tester.enterText(find.byKey(const Key('displayNameField')), 'Mario');

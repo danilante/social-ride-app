@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:social_ride_app/services/recent_ride_store.dart';
 import 'package:social_ride_app/services/ride_repository.dart';
 import 'package:social_ride_app/theme.dart';
 
 class HomeScreen extends StatefulWidget {
   final RideRepository rideRepository;
   final void Function(String rideId) onRideReady;
+  final RecentRideStore? recentRideStore;
 
   const HomeScreen({
     super.key,
     required this.rideRepository,
     required this.onRideReady,
+    this.recentRideStore,
   });
 
   @override
@@ -20,6 +23,19 @@ class _HomeScreenState extends State<HomeScreen> {
   final _nameController = TextEditingController();
   final _rideNameController = TextEditingController();
   final _rideCodeController = TextEditingController();
+  RecentRide? _recentRide;
+
+  RecentRideStore get _recentRideStore =>
+      widget.recentRideStore ?? SharedPreferencesRecentRideStore();
+
+  @override
+  void initState() {
+    super.initState();
+    _recentRideStore.load().then((ride) {
+      if (!mounted || ride == null) return;
+      setState(() => _recentRide = ride);
+    });
+  }
 
   bool _requireName() {
     if (_nameController.text.trim().isNotEmpty) return true;
@@ -31,22 +47,69 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _createRide() async {
     if (!_requireName()) return;
+    final displayName = _nameController.text.trim();
     final rideId = await widget.rideRepository
-        .createRide(_rideNameController.text, _nameController.text.trim());
+        .createRide(_rideNameController.text, displayName);
+    await _recentRideStore
+        .save(RecentRide(rideId: rideId, displayName: displayName));
     widget.onRideReady(rideId);
   }
 
   Future<void> _joinRide() async {
     if (!_requireName()) return;
+    final displayName = _nameController.text.trim();
     try {
-      final rideId = await widget.rideRepository.joinRide(
-          _rideCodeController.text.trim(), _nameController.text.trim());
+      final rideId = await widget.rideRepository
+          .joinRide(_rideCodeController.text.trim(), displayName);
+      await _recentRideStore
+          .save(RecentRide(rideId: rideId, displayName: displayName));
       widget.onRideReady(rideId);
     } on RideNotFoundException {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Ride non trovata, controlla il codice')),
       );
     }
+  }
+
+  Widget _buildRecentRideCard(RecentRide ride) {
+    return Container(
+      key: const Key('recentRideCard'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: socialRideInk,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.pedal_bike_rounded, color: socialRideOrange),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Hai una ride aperta',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  'Codice ${ride.rideId}',
+                  style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            key: const Key('continueRecentRideButton'),
+            onPressed: () => widget.onRideReady(ride.rideId),
+            child: const Text('Continua'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _sectionCard({required Widget child}) {
@@ -101,6 +164,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
               ),
               const SizedBox(height: 28),
+              if (_recentRide != null) ...[
+                _buildRecentRideCard(_recentRide!),
+                const SizedBox(height: 16),
+              ],
               TextField(
                 key: const Key('displayNameField'),
                 controller: _nameController,
