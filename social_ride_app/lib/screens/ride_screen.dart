@@ -935,23 +935,6 @@ class _RideScreenState extends State<RideScreen>
               );
             },
           ),
-          StreamBuilder<Ride>(
-            stream: widget.rideRepository.streamRide(widget.rideId),
-            builder: (context, snapshot) {
-              final ride = snapshot.data;
-              if (ride == null) return const SizedBox.shrink();
-              final isCreator =
-                  ride.creatorId == widget.rideRepository.currentUserId();
-              return IconButton(
-                key: const Key('endOrLeaveRideButton'),
-                icon: Icon(isCreator
-                    ? Icons.stop_circle_outlined
-                    : Icons.logout_rounded),
-                tooltip: isCreator ? 'Termina ride' : 'Esci dalla ride',
-                onPressed: isCreator ? _endRide : _leaveRide,
-              );
-            },
-          ),
         ],
       ),
       body: StreamBuilder<List<RiderDoc>>(
@@ -1032,6 +1015,35 @@ class _RideScreenState extends State<RideScreen>
                     markers: buildMarkers(riders, icons: _markerIcons),
                   ),
                 ),
+              ),
+              StreamBuilder<Ride>(
+                stream: widget.rideRepository.streamRide(widget.rideId),
+                builder: (context, snapshot) {
+                  final ride = snapshot.data;
+                  if (ride == null) return const SizedBox.shrink();
+                  final isCreator =
+                      ride.creatorId == widget.rideRepository.currentUserId();
+                  return SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding:
+                          const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                      child: OutlinedButton.icon(
+                        key: const Key('endOrLeaveRideButton'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.redAccent,
+                          side: const BorderSide(color: Colors.redAccent),
+                        ),
+                        icon: Icon(isCreator
+                            ? Icons.stop_circle_outlined
+                            : Icons.logout_rounded),
+                        label: Text(
+                            isCreator ? 'Termina ride' : 'Esci dalla ride'),
+                        onPressed: isCreator ? _endRide : _leaveRide,
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           );
