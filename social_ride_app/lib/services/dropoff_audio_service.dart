@@ -75,6 +75,10 @@ class DropoffAudioService {
     }
 
     final userId = rideRepository.currentUserId();
+    // Delete any previous clip first so re-recording always gets a fresh
+    // Storage object/token instead of risking another rider's player (or a
+    // CDN) serving a cached copy of the old clip for the same path.
+    await uploader.delete(rideId, userId);
     final url = await uploader.upload(rideId, userId, filePath);
     await rideRepository.updateDropoffAudioUrl(rideId, url);
     return url;

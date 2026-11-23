@@ -5,8 +5,10 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:social_ride_app/models/rider_doc.dart';
 
 /// Cache key for a rider's marker icon: changes when the rider's state
-/// (in group / dropped off) changes, so a new icon color is generated.
-String markerIconKey(RiderDoc rider) => '${rider.userId}_${rider.state}';
+/// (in group / dropped off) or displayName changes, so a new icon is
+/// generated instead of showing a stale color or initial letter.
+String markerIconKey(RiderDoc rider) =>
+    '${rider.userId}_${rider.state}_${rider.displayName}';
 
 Set<Marker> buildMarkers(
   List<RiderDoc> riders, {

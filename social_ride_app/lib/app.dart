@@ -44,7 +44,9 @@ class _SocialRideAppState extends State<SocialRideApp> {
   @override
   void initState() {
     super.initState();
-    _audioAlertSession.configureForAlerts();
+    _audioAlertSession.configureForAlerts().catchError((error) {
+      debugPrint('Failed to configure audio session for alerts: $error');
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowVolumeNotice());
   }
 

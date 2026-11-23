@@ -71,6 +71,25 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _continueRecentRide(RecentRide ride) async {
+    try {
+      // Re-run the join upsert instead of just navigating: it restores the
+      // rider's displayName/state if their doc was ever missing (ride
+      // cleaned up, doc deleted externally), and confirms the ride still
+      // exists before dropping the user into a dead screen.
+      final rideId =
+          await widget.rideRepository.joinRide(ride.rideId, ride.displayName);
+      widget.onRideReady(rideId);
+    } on RideNotFoundException {
+      await _recentRideStore.clear();
+      if (!mounted) return;
+      setState(() => _recentRide = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Quella ride non è più disponibile')),
+      );
+    }
+  }
+
   Widget _buildRecentRideCard(RecentRide ride) {
     return Container(
       key: const Key('recentRideCard'),
@@ -104,7 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 8),
           ElevatedButton(
             key: const Key('continueRecentRideButton'),
-            onPressed: () => widget.onRideReady(ride.rideId),
+            onPressed: () => _continueRecentRide(ride),
             child: const Text('Continua'),
           ),
         ],

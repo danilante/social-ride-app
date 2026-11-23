@@ -6,14 +6,34 @@ const { evaluateRider } = require('./dropoff');
 
 initializeApp();
 
+// Ride-configured settings come straight from a client-writable Firestore
+// doc, so clamp them to sane bounds here too (not just in firestore.rules)
+// before they can ever collapse the drop-off detection window.
+const MIN_THRESHOLD_METERS = 50;
+const MAX_THRESHOLD_METERS = 1000;
+const MIN_DWELL_SECONDS = 10;
+const MAX_DWELL_SECONDS = 300;
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
 async function handleRiderPositionWritten(db, messaging, rideId, userId) {
     const rideRef = db.collection('rides').doc(rideId);
     const [rideSnap, ridersSnap] = await Promise.all([
       rideRef.get(),
       rideRef.collection('riders').get(),
     ]);
-    const thresholdMeters = rideSnap.data()?.dropoffThresholdMeters;
-    const dwellSeconds = rideSnap.data()?.dropoffDwellSeconds;
+    const rawThresholdMeters = rideSnap.data()?.dropoffThresholdMeters;
+    const rawDwellSeconds = rideSnap.data()?.dropoffDwellSeconds;
+    const thresholdMeters =
+      typeof rawThresholdMeters === 'number'
+        ? clamp(rawThresholdMeters, MIN_THRESHOLD_METERS, MAX_THRESHOLD_METERS)
+        : undefined;
+    const dwellSeconds =
+      typeof rawDwellSeconds === 'number'
+        ? clamp(rawDwellSeconds, MIN_DWELL_SECONDS, MAX_DWELL_SECONDS)
+        : undefined;
 
     const riders = ridersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     const rider = riders.find((r) => r.id === userId);

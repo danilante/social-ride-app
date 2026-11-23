@@ -55,6 +55,7 @@ class _RideScreenState extends State<RideScreen>
   final Map<String, BitmapDescriptor> _markerIcons = {};
   final Set<String> _generatingMarkerIconKeys = {};
   bool _isRecording = false;
+  int _recordingSession = 0;
   Duration _recordingElapsed = Duration.zero;
   Timer? _recordingTicker;
   String? _pendingRecordingPath;
@@ -173,6 +174,7 @@ class _RideScreenState extends State<RideScreen>
       return;
     }
     await _recorder.start();
+    final session = ++_recordingSession;
     setState(() {
       _isRecording = true;
       _pendingRecordingPath = null;
@@ -188,7 +190,10 @@ class _RideScreenState extends State<RideScreen>
       _sheetRefresh?.call();
     });
     Future.delayed(dropoffAudioMaxDuration, () async {
-      if (!mounted || !_isRecording) return;
+      // Guard against a stale timer from an earlier recording: if this one
+      // was already stopped and a new one started before this fires, the
+      // session id no longer matches, so don't truncate the new recording.
+      if (!mounted || !_isRecording || session != _recordingSession) return;
       await _stopRecording();
     });
   }

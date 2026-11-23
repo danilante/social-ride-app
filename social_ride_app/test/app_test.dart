@@ -26,6 +26,9 @@ class _FakeRecentRideStore implements RecentRideStore {
 
   @override
   Future<RecentRide?> load() async => _ride;
+
+  @override
+  Future<void> clear() async => _ride = null;
 }
 
 class _FakeAudioAlertSession implements AudioAlertSession {

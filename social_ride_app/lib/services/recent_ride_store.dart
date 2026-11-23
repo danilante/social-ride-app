@@ -13,6 +13,7 @@ class RecentRide {
 abstract class RecentRideStore {
   Future<void> save(RecentRide ride);
   Future<RecentRide?> load();
+  Future<void> clear();
 }
 
 class SharedPreferencesRecentRideStore implements RecentRideStore {
@@ -33,5 +34,12 @@ class SharedPreferencesRecentRideStore implements RecentRideStore {
     final displayName = prefs.getString(_displayNameKey);
     if (rideId == null || displayName == null) return null;
     return RecentRide(rideId: rideId, displayName: displayName);
+  }
+
+  @override
+  Future<void> clear() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_rideIdKey);
+    await prefs.remove(_displayNameKey);
   }
 }

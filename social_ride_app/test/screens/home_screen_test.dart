@@ -13,6 +13,9 @@ class _FakeRecentRideStore implements RecentRideStore {
 
   @override
   Future<RecentRide?> load() async => _ride;
+
+  @override
+  Future<void> clear() async => _ride = null;
 }
 
 void main() {
@@ -168,6 +171,73 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(readyRideId, rideId);
+  });
+
+  testWidgets(
+      'continuing a recent ride re-adds the rider doc if it was missing',
+      (tester) async {
+    final firestore = FakeFirebaseFirestore();
+    final repository =
+        RideRepository(firestore: firestore, currentUserId: () => 'user1');
+    final rideId = await repository.createRide('Giro', 'Mario');
+    await firestore
+        .collection('rides')
+        .doc(rideId)
+        .collection('riders')
+        .doc('user1')
+        .delete();
+    final store = _FakeRecentRideStore();
+    await store.save(RecentRide(rideId: rideId, displayName: 'Mario'));
+    String? readyRideId;
+
+    await tester.pumpWidget(MaterialApp(
+      home: HomeScreen(
+        rideRepository: repository,
+        onRideReady: (id) => readyRideId = id,
+        recentRideStore: store,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('continueRecentRideButton')));
+    await tester.pumpAndSettle();
+
+    expect(readyRideId, rideId);
+    final riderDoc = await firestore
+        .collection('rides')
+        .doc(rideId)
+        .collection('riders')
+        .doc('user1')
+        .get();
+    expect(riderDoc.data()?['displayName'], 'Mario');
+  });
+
+  testWidgets(
+      'continuing a recent ride that no longer exists clears the shortcut',
+      (tester) async {
+    final firestore = FakeFirebaseFirestore();
+    final repository =
+        RideRepository(firestore: firestore, currentUserId: () => 'user1');
+    final store = _FakeRecentRideStore();
+    await store.save(const RecentRide(rideId: 'ZZZZZZ', displayName: 'Mario'));
+    String? readyRideId;
+
+    await tester.pumpWidget(MaterialApp(
+      home: HomeScreen(
+        rideRepository: repository,
+        onRideReady: (id) => readyRideId = id,
+        recentRideStore: store,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('continueRecentRideButton')));
+    await tester.pumpAndSettle();
+
+    expect(readyRideId, isNull);
+    expect(find.byKey(const Key('recentRideCard')), findsNothing);
+    expect(await store.load(), isNull);
+    expect(find.textContaining('non è più disponibile'), findsOneWidget);
   });
 
   testWidgets('joining with a nonexistent ride code shows an error and stays on home',

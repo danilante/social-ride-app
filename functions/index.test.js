@@ -133,18 +133,68 @@ test('includes the dropped-off rider\'s custom audio URL in the push payload',
     assert.strictEqual(sent[0].data.dropoffAudioUrl, 'https://example.com/mario.m4a');
   });
 
+test('clamps a dropoffDwellSeconds of 0 instead of collapsing the dwell window',
+  async () => {
+    const now = Date.now();
+    const writes = [];
+    const sent = [];
+    const db = fakeDb({
+      ride: { dropoffThresholdMeters: 50, dropoffDwellSeconds: 0 },
+      riders: {
+        me: {
+          lat: 0.0009,
+          lng: 0,
+          state: 'in_group',
+          thresholdExceededSince: now - 1000,
+          displayName: 'Mario',
+        },
+        other1: { lat: 0, lng: 0, state: 'in_group', fcmToken: 'tok1' },
+      },
+      writes,
+    });
+
+    await handleRiderPositionWritten(db, fakeMessaging(sent), 'ride1', 'me');
+
+    assert.strictEqual(writes[0].data.state, 'in_group');
+  });
+
+test('clamps an oversized dropoffThresholdMeters instead of trusting it unbounded',
+  async () => {
+    const now = Date.now();
+    const writes = [];
+    const sent = [];
+    const db = fakeDb({
+      ride: { dropoffThresholdMeters: 999999, dropoffDwellSeconds: 5 },
+      riders: {
+        me: {
+          lat: 10,
+          lng: 10,
+          state: 'in_group',
+          thresholdExceededSince: now - 6000,
+          displayName: 'Mario',
+        },
+        other1: { lat: 0, lng: 0, state: 'in_group', fcmToken: 'tok1' },
+      },
+      writes,
+    });
+
+    await handleRiderPositionWritten(db, fakeMessaging(sent), 'ride1', 'me');
+
+    assert.strictEqual(writes[0].data.state, 'in_group');
+  });
+
 test('respects a custom dropoffDwellSeconds from the ride settings', async () => {
   const now = Date.now();
   const writes = [];
   const sent = [];
   const db = fakeDb({
-    ride: { dropoffThresholdMeters: 50, dropoffDwellSeconds: 5 },
+    ride: { dropoffThresholdMeters: 50, dropoffDwellSeconds: 15 },
     riders: {
       me: {
         lat: 0.0009,
         lng: 0,
         state: 'in_group',
-        thresholdExceededSince: now - 6000,
+        thresholdExceededSince: now - 16000,
         displayName: 'Mario',
       },
       other1: { lat: 0, lng: 0, state: 'in_group', fcmToken: 'tok1' },

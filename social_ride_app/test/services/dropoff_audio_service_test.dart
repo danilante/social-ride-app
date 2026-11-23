@@ -56,6 +56,24 @@ void main() {
     expect(riderDoc.data()!['dropoffAudioUrl'], 'https://example.com/mine.m4a');
   });
 
+  test('setDropoffAudio deletes any previous clip before uploading a new one',
+      () async {
+    final firestore = FakeFirebaseFirestore();
+    final repo =
+        RideRepository(firestore: firestore, currentUserId: () => 'user1');
+    final rideId = await repo.createRide('Giro', 'Mario');
+    final uploader = _FakeUploader();
+    final service = DropoffAudioService(
+      rideRepository: repo,
+      durationReader: _FakeDurationReader(const Duration(seconds: 5)),
+      uploader: uploader,
+    );
+
+    await service.setDropoffAudio(rideId, '/tmp/clip.m4a');
+
+    expect(uploader.deletedForRide, rideId);
+  });
+
   test('setDropoffAudio rejects a clip longer than 6 seconds without uploading',
       () async {
     final firestore = FakeFirebaseFirestore();
