@@ -45,6 +45,8 @@ enum _LocationStatus { idle, requesting, sharing, denied }
 class _RideScreenState extends State<RideScreen>
     with SingleTickerProviderStateMixin {
   StreamSubscription? _positionSubscription;
+  StreamSubscription<Ride>? _rideStatusSubscription;
+  bool _hasLeftOrEnded = false;
   _LocationStatus _status = _LocationStatus.idle;
   DropoffAudioService? _audioServiceCache;
   DropoffRecorder? _recorderCache;
@@ -85,6 +87,72 @@ class _RideScreenState extends State<RideScreen>
   void initState() {
     super.initState();
     widget.pushService.registerForRide(widget.rideId);
+    _rideStatusSubscription =
+        widget.rideRepository.streamRide(widget.rideId).listen((ride) {
+      if (ride.status != 'ended' || _hasLeftOrEnded || !mounted) return;
+      _hasLeftOrEnded = true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('La ride è stata terminata dal creatore')),
+      );
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    });
+  }
+
+  Future<bool> _confirmDestructive({
+    required String title,
+    required String message,
+    required String confirmLabel,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Annulla'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(confirmLabel,
+                style: const TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
+  }
+
+  Future<void> _endRide() async {
+    final confirmed = await _confirmDestructive(
+      title: 'Terminare la ride?',
+      message:
+          'La ride verrà chiusa per tutti i partecipanti e non sarà più '
+          'possibile tornarci.',
+      confirmLabel: 'Termina',
+    );
+    if (!confirmed) return;
+    await widget.rideRepository.endRide(widget.rideId);
+    // The status-change listener above handles the pop + snackbar for
+    // everyone still viewing the ride, this user included.
+  }
+
+  Future<void> _leaveRide() async {
+    final confirmed = await _confirmDestructive(
+      title: 'Uscire dalla ride?',
+      message: 'Smetterai di condividere la posizione e di vedere gli altri '
+          'rider di questa ride.',
+      confirmLabel: 'Esci',
+    );
+    if (!confirmed) return;
+    _hasLeftOrEnded = true;
+    await widget.rideRepository.leaveRide(widget.rideId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Sei uscito dalla ride')),
+    );
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   Future<void> _startSharingPosition() async {
@@ -106,6 +174,7 @@ class _RideScreenState extends State<RideScreen>
   @override
   void dispose() {
     _positionSubscription?.cancel();
+    _rideStatusSubscription?.cancel();
     _recordingTicker?.cancel();
     _recordingPulseController.dispose();
     _alertPlayer.dispose();
@@ -863,6 +932,23 @@ class _RideScreenState extends State<RideScreen>
                 icon: const Icon(Icons.tune_rounded),
                 tooltip: 'Impostazioni ride',
                 onPressed: () => _openRideSettingsSheet(ride),
+              );
+            },
+          ),
+          StreamBuilder<Ride>(
+            stream: widget.rideRepository.streamRide(widget.rideId),
+            builder: (context, snapshot) {
+              final ride = snapshot.data;
+              if (ride == null) return const SizedBox.shrink();
+              final isCreator =
+                  ride.creatorId == widget.rideRepository.currentUserId();
+              return IconButton(
+                key: const Key('endOrLeaveRideButton'),
+                icon: Icon(isCreator
+                    ? Icons.stop_circle_outlined
+                    : Icons.logout_rounded),
+                tooltip: isCreator ? 'Termina ride' : 'Esci dalla ride',
+                onPressed: isCreator ? _endRide : _leaveRide,
               );
             },
           ),

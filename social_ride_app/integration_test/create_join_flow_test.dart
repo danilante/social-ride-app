@@ -32,6 +32,18 @@ Widget _appFor(RideRepository repo) => SocialRideApp(
           PushService(tokenProvider: _FakeTokenProvider(), rideRepository: r),
     );
 
+/// The real app shows a one-time "alerts play over silent mode" dialog on
+/// first launch (lib/app.dart). Dismiss it so it doesn't block taps on the
+/// home screen underneath, same as a real first-time user would.
+Future<void> _dismissVolumeNoticeIfShown(WidgetTester tester) async {
+  await tester.pumpAndSettle();
+  final acceptButton = find.byKey(const Key('volumeNoticeAcceptButton'));
+  if (acceptButton.evaluate().isNotEmpty) {
+    await tester.tap(acceptButton);
+    await tester.pumpAndSettle();
+  }
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -50,6 +62,7 @@ void main() {
     );
 
     await tester.pumpWidget(_appFor(repo));
+    await _dismissVolumeNoticeIfShown(tester);
     await tester.enterText(find.byKey(const Key('displayNameField')), 'Mario');
     await tester.enterText(find.byKey(const Key('rideNameField')), 'Giro reale');
     await tester.tap(find.byKey(const Key('createRideButton')));
@@ -80,6 +93,7 @@ void main() {
     );
 
     await tester.pumpWidget(_appFor(lucaRepo));
+    await _dismissVolumeNoticeIfShown(tester);
     await tester.enterText(find.byKey(const Key('displayNameField')), 'Luca');
     await tester.enterText(find.byKey(const Key('rideCodeField')), rideId);
     await tester.tap(find.byKey(const Key('joinRideButton')));
@@ -99,6 +113,7 @@ void main() {
     );
 
     await tester.pumpWidget(_appFor(repo));
+    await _dismissVolumeNoticeIfShown(tester);
     await tester.enterText(find.byKey(const Key('displayNameField')), 'Luca');
     await tester.enterText(find.byKey(const Key('rideCodeField')), 'ZZZZZZ');
     await tester.tap(find.byKey(const Key('joinRideButton')));

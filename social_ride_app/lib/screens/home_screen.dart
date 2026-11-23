@@ -93,7 +93,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildRecentRideCard(RecentRide ride) {
     return Container(
       key: const Key('recentRideCard'),
-      width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: socialRideInk,
@@ -123,6 +122,12 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 8),
           ElevatedButton(
             key: const Key('continueRecentRideButton'),
+            // Override the app-wide ElevatedButton theme: its
+            // Size.fromHeight(50) minimum size has an infinite width
+            // (intended for full-width buttons), which would force this
+            // button to claim nearly all the Row's space and collapse the
+            // Expanded text next to it.
+            style: ElevatedButton.styleFrom(minimumSize: const Size(0, 44)),
             onPressed: () => _continueRecentRide(ride),
             child: const Text('Continua'),
           ),

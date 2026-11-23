@@ -301,4 +301,94 @@ void main() {
     expect(find.byKey(const Key('retryLocationButton')), findsOneWidget);
     expect(find.textContaining('negato'), findsOneWidget);
   });
+
+  testWidgets('creator sees end-ride button and ending it sets status ended',
+      (tester) async {
+    final locationService =
+        LocationService(checkPermission: () async => LocationPermission.denied);
+
+    await tester.pumpWidget(MaterialApp(
+      home: RideScreen(
+        rideId: rideId,
+        rideRepository: repository,
+        locationService: locationService,
+        pushService: pushService,
+        alertSpeaker: alertSpeaker,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.stop_circle_outlined), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('endOrLeaveRideButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Termina'));
+    await tester.pumpAndSettle();
+
+    final rideDoc = await firestore.collection('rides').doc(rideId).get();
+    expect(rideDoc.data()!['status'], 'ended');
+    expect(find.textContaining('terminata dal creatore'), findsOneWidget);
+  });
+
+  testWidgets('non-creator sees leave-ride button and leaving removes their rider doc',
+      (tester) async {
+    final joinerRepo =
+        RideRepository(firestore: firestore, currentUserId: () => 'user2');
+    await joinerRepo.joinRide(rideId, 'Luca');
+    final locationService =
+        LocationService(checkPermission: () async => LocationPermission.denied);
+
+    await tester.pumpWidget(MaterialApp(
+      home: RideScreen(
+        rideId: rideId,
+        rideRepository: joinerRepo,
+        locationService: locationService,
+        pushService: pushService,
+        alertSpeaker: alertSpeaker,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.logout_rounded), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('endOrLeaveRideButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Esci'));
+    await tester.pumpAndSettle();
+
+    final riderDoc = await firestore
+        .collection('rides')
+        .doc(rideId)
+        .collection('riders')
+        .doc('user2')
+        .get();
+    expect(riderDoc.exists, isFalse);
+    expect(find.textContaining('Sei uscito dalla ride'), findsOneWidget);
+  });
+
+  testWidgets(
+      'a rider still viewing the ride gets kicked back when the creator ends it',
+      (tester) async {
+    final joinerRepo =
+        RideRepository(firestore: firestore, currentUserId: () => 'user2');
+    await joinerRepo.joinRide(rideId, 'Luca');
+    final locationService =
+        LocationService(checkPermission: () async => LocationPermission.denied);
+
+    await tester.pumpWidget(MaterialApp(
+      home: RideScreen(
+        rideId: rideId,
+        rideRepository: joinerRepo,
+        locationService: locationService,
+        pushService: pushService,
+        alertSpeaker: alertSpeaker,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await repository.endRide(rideId);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('terminata dal creatore'), findsOneWidget);
+  });
 }

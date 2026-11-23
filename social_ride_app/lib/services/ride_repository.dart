@@ -69,11 +69,32 @@ class RideRepository {
   Future<String> joinRide(String rideId, String displayName) async {
     final normalizedId = rideId.toUpperCase();
     final rideDoc = await firestore.collection('rides').doc(normalizedId).get();
-    if (!rideDoc.exists) {
+    if (!rideDoc.exists || rideDoc.data()?['status'] == 'ended') {
       throw RideNotFoundException(normalizedId);
     }
     await _addRider(normalizedId, displayName);
     return normalizedId;
+  }
+
+  /// Ends the ride for everyone (creator-only in the UI; also enforced by
+  /// firestore.rules). Riders still viewing it get kicked back to the home
+  /// screen by RideScreen's status listener.
+  Future<void> endRide(String rideId) {
+    return firestore
+        .collection('rides')
+        .doc(rideId)
+        .set({'status': 'ended'}, SetOptions(merge: true));
+  }
+
+  /// Removes the current user from the ride's rider list without affecting
+  /// the ride itself.
+  Future<void> leaveRide(String rideId) {
+    return firestore
+        .collection('rides')
+        .doc(rideId)
+        .collection('riders')
+        .doc(currentUserId())
+        .delete();
   }
 
   Future<void> _addRider(String rideId, String displayName) {

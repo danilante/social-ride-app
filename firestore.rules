@@ -5,20 +5,29 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow create: if request.auth != null
         && request.resource.data.creatorId == request.auth.uid;
-      // Only the creator can update a ride doc, and only to tune the
-      // drop-off thresholds within sane bounds — not to reassign
-      // ownership or rewrite the ride's name/status.
+      // Only the creator can update a ride doc, and only for one of two
+      // narrow reasons — not to reassign ownership or rewrite the name:
+      // tune the drop-off thresholds (status unchanged), or end the ride
+      // (status flips to 'ended', everything else stays put).
       allow update: if request.auth != null
         && resource.data.creatorId == request.auth.uid
         && request.resource.data.creatorId == resource.data.creatorId
         && request.resource.data.name == resource.data.name
-        && request.resource.data.status == resource.data.status
-        && request.resource.data.dropoffThresholdMeters is number
-        && request.resource.data.dropoffThresholdMeters >= 50
-        && request.resource.data.dropoffThresholdMeters <= 1000
-        && request.resource.data.dropoffDwellSeconds is number
-        && request.resource.data.dropoffDwellSeconds >= 10
-        && request.resource.data.dropoffDwellSeconds <= 300;
+        && (
+          (request.resource.data.status == resource.data.status
+            && request.resource.data.dropoffThresholdMeters is number
+            && request.resource.data.dropoffThresholdMeters >= 50
+            && request.resource.data.dropoffThresholdMeters <= 1000
+            && request.resource.data.dropoffDwellSeconds is number
+            && request.resource.data.dropoffDwellSeconds >= 10
+            && request.resource.data.dropoffDwellSeconds <= 300)
+          ||
+          (request.resource.data.status == 'ended'
+            && request.resource.data.dropoffThresholdMeters ==
+               resource.data.dropoffThresholdMeters
+            && request.resource.data.dropoffDwellSeconds ==
+               resource.data.dropoffDwellSeconds)
+        );
       allow delete: if false;
 
       match /riders/{userId} {

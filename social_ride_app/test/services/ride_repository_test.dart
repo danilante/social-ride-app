@@ -224,4 +224,62 @@ void main() {
       throwsA(isA<RideNotFoundException>()),
     );
   });
+
+  test('endRide marks the ride as ended', () async {
+    final firestore = FakeFirebaseFirestore();
+    final repo = RideRepository(
+      firestore: firestore,
+      currentUserId: () => 'user1',
+    );
+    final rideId = await repo.createRide('Giro', 'Mario');
+
+    await repo.endRide(rideId);
+
+    final ride = await repo.streamRide(rideId).first;
+    expect(ride.status, 'ended');
+  });
+
+  test('joinRide throws RideNotFoundException for an ended ride', () async {
+    final firestore = FakeFirebaseFirestore();
+    final repo = RideRepository(
+      firestore: firestore,
+      currentUserId: () => 'user1',
+    );
+    final rideId = await repo.createRide('Giro', 'Mario');
+    await repo.endRide(rideId);
+
+    final joinerRepo = RideRepository(
+      firestore: firestore,
+      currentUserId: () => 'user2',
+    );
+
+    expect(
+      () => joinerRepo.joinRide(rideId, 'Luca'),
+      throwsA(isA<RideNotFoundException>()),
+    );
+  });
+
+  test('leaveRide removes the current user from the riders list', () async {
+    final firestore = FakeFirebaseFirestore();
+    final creatorRepo = RideRepository(
+      firestore: firestore,
+      currentUserId: () => 'user1',
+    );
+    final rideId = await creatorRepo.createRide('Giro', 'Mario');
+    final joinerRepo = RideRepository(
+      firestore: firestore,
+      currentUserId: () => 'user2',
+    );
+    await joinerRepo.joinRide(rideId, 'Luca');
+
+    await joinerRepo.leaveRide(rideId);
+
+    final riderDoc = await firestore
+        .collection('rides')
+        .doc(rideId)
+        .collection('riders')
+        .doc('user2')
+        .get();
+    expect(riderDoc.exists, isFalse);
+  });
 }
