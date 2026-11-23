@@ -44,8 +44,16 @@ class _RideScreenState extends State<RideScreen> {
   DropoffAudioService? _audioServiceCache;
   DropoffRecorder? _recorderCache;
   final _alertPlayer = AudioPlayer();
+  final _previewPlayer = AudioPlayer();
   final Set<String> _playedDropoffAlertFor = {};
+  final Map<String, BitmapDescriptor> _markerIcons = {};
+  final Set<String> _generatingMarkerIconKeys = {};
   bool _isRecording = false;
+  Duration _recordingElapsed = Duration.zero;
+  Timer? _recordingTicker;
+  String? _pendingRecordingPath;
+  bool _isPreviewPlaying = false;
+  VoidCallback? _sheetRefresh;
 
   DropoffAudioService get _audioService =>
       widget.dropoffAudioService ??
@@ -82,9 +90,31 @@ class _RideScreenState extends State<RideScreen> {
   @override
   void dispose() {
     _positionSubscription?.cancel();
+    _recordingTicker?.cancel();
     _alertPlayer.dispose();
+    _previewPlayer.dispose();
     _recorderCache?.dispose();
     super.dispose();
+  }
+
+  /// Generates and caches a colored, initial-letter marker icon per rider so
+  /// the map shows who each position belongs to instead of a plain dot.
+  void _ensureMarkerIcons(List<RiderDoc> riders) {
+    for (final r in riders) {
+      final key = markerIconKey(r);
+      if (_markerIcons.containsKey(key) ||
+          _generatingMarkerIconKeys.contains(key)) {
+        continue;
+      }
+      _generatingMarkerIconKeys.add(key);
+      final color =
+          r.state == RiderState.droppedOff ? Colors.redAccent : socialRideOrange;
+      createInitialMarkerIcon(r.displayName, color).then((icon) {
+        _generatingMarkerIconKeys.remove(key);
+        if (!mounted) return;
+        setState(() => _markerIcons[key] = icon);
+      });
+    }
   }
 
   void _maybePlayDropoffAlerts(List<RiderDoc> riders) {
@@ -110,9 +140,7 @@ class _RideScreenState extends State<RideScreen> {
 
   Future<void> _toggleRecording() async {
     if (_isRecording) {
-      setState(() => _isRecording = false);
-      final path = await _recorder.stop();
-      if (path != null) await _applyDropoffAudio(path);
+      await _stopRecording();
       return;
     }
     final granted = await _recorder.hasPermission();
@@ -124,13 +152,84 @@ class _RideScreenState extends State<RideScreen> {
       return;
     }
     await _recorder.start();
-    setState(() => _isRecording = true);
+    setState(() {
+      _isRecording = true;
+      _pendingRecordingPath = null;
+      _recordingElapsed = Duration.zero;
+    });
+    _recordingTicker?.cancel();
+    _recordingTicker = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (!mounted) return;
+      setState(() {
+        _recordingElapsed += const Duration(milliseconds: 100);
+      });
+      _sheetRefresh?.call();
+    });
     Future.delayed(dropoffAudioMaxDuration, () async {
       if (!mounted || !_isRecording) return;
-      setState(() => _isRecording = false);
-      final path = await _recorder.stop();
-      if (path != null) await _applyDropoffAudio(path);
+      await _stopRecording();
     });
+  }
+
+  Future<void> _stopRecording() async {
+    _recordingTicker?.cancel();
+    final path = await _recorder.stop();
+    if (!mounted) return;
+    setState(() {
+      _isRecording = false;
+      _pendingRecordingPath = path;
+    });
+    _sheetRefresh?.call();
+  }
+
+  Future<void> _togglePreviewPlayback() async {
+    final path = _pendingRecordingPath;
+    if (path == null) return;
+    if (_isPreviewPlaying) {
+      await _previewPlayer.stop();
+      if (!mounted) return;
+      setState(() => _isPreviewPlaying = false);
+      _sheetRefresh?.call();
+      return;
+    }
+    await _previewPlayer.setFilePath(path);
+    setState(() => _isPreviewPlaying = true);
+    _sheetRefresh?.call();
+    unawaited(_previewPlayer.play().then((_) {
+      if (!mounted) return;
+      setState(() => _isPreviewPlaying = false);
+      _sheetRefresh?.call();
+    }));
+  }
+
+  Future<void> _discardRecording() async {
+    await _previewPlayer.stop();
+    if (!mounted) return;
+    setState(() {
+      _pendingRecordingPath = null;
+      _isPreviewPlaying = false;
+      _recordingElapsed = Duration.zero;
+    });
+    _sheetRefresh?.call();
+  }
+
+  Future<void> _confirmRecording() async {
+    final path = _pendingRecordingPath;
+    if (path == null) return;
+    await _previewPlayer.stop();
+    await _applyDropoffAudio(path);
+    if (!mounted) return;
+    setState(() {
+      _pendingRecordingPath = null;
+      _isPreviewPlaying = false;
+      _recordingElapsed = Duration.zero;
+    });
+    _sheetRefresh?.call();
+  }
+
+  String _formatElapsed(Duration d) {
+    final seconds = d.inMilliseconds / 1000;
+    return '${seconds.toStringAsFixed(1)}s';
   }
 
   Future<void> _applyDropoffAudio(String filePath) async {
@@ -156,76 +255,189 @@ class _RideScreenState extends State<RideScreen> {
     );
   }
 
+  Widget _buildRecordingIndicator() {
+    return Row(
+      key: const Key('recordingIndicator'),
+      children: [
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.3, end: 1),
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+          builder: (context, opacity, _) => Opacity(
+            opacity: opacity,
+            child: const Icon(Icons.fiber_manual_record_rounded,
+                color: Colors.redAccent, size: 16),
+          ),
+          onEnd: () => setState(() {}),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          'Sto registrando… ${_formatElapsed(_recordingElapsed)}',
+          key: const Key('recordingElapsedText'),
+          style: const TextStyle(
+            color: Colors.redAccent,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecordingPreview({required VoidCallback onConfirmed}) {
+    return Container(
+      key: const Key('recordingPreview'),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F3F5),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                key: const Key('playRecordingPreviewButton'),
+                icon: Icon(
+                  _isPreviewPlaying
+                      ? Icons.pause_circle_filled_rounded
+                      : Icons.play_circle_fill_rounded,
+                  color: socialRideOrange,
+                  size: 36,
+                ),
+                onPressed: _togglePreviewPlayback,
+              ),
+              const Expanded(
+                child: Text('Clip registrata: riascoltala prima di usarla',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const Key('discardRecordingButton'),
+                  onPressed: _discardRecording,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Registra di nuovo'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  key: const Key('confirmRecordingButton'),
+                  onPressed: () async {
+                    await _confirmRecording();
+                    onConfirmed();
+                  },
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Usa questo audio'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   void _openDropoffAudioSheet(String? currentAudioUrl) {
+    setState(() {
+      _pendingRecordingPath = null;
+      _isPreviewPlaying = false;
+      _recordingElapsed = Duration.zero;
+    });
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetContext) => StatefulBuilder(
-        builder: (sheetContext, setSheetState) => Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Row(
-                children: [
-                  Icon(Icons.graphic_eq_rounded, color: socialRideOrange),
-                  SizedBox(width: 8),
-                  Text('Il tuo audio allontanamento',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Verrà riprodotto sul telefono degli altri quando ti stacchi '
-                'dal gruppo. Max 6 secondi.',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                key: const Key('recordDropoffAudioButton'),
-                onPressed: () async {
-                  await _toggleRecording();
-                  setSheetState(() {});
-                },
-                icon: Icon(_isRecording
-                    ? Icons.stop_circle_rounded
-                    : Icons.mic_rounded),
-                label: Text(_isRecording
-                    ? 'Stop registrazione'
-                    : 'Registra in app'),
-              ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                key: const Key('uploadDropoffAudioButton'),
-                onPressed: () async {
-                  await _pickAudioFile();
-                  if (sheetContext.mounted) Navigator.of(sheetContext).pop();
-                },
-                icon: const Icon(Icons.upload_file_rounded),
-                label: const Text('Carica un file'),
-              ),
-              if (currentAudioUrl != null) ...[
-                const SizedBox(height: 10),
-                TextButton.icon(
-                  key: const Key('removeDropoffAudioButton'),
-                  onPressed: () async {
-                    await _removeDropoffAudio();
-                    if (sheetContext.mounted) Navigator.of(sheetContext).pop();
-                  },
-                  icon: const Icon(Icons.delete_outline_rounded,
-                      color: Colors.redAccent),
-                  label: const Text('Rimuovi audio',
-                      style: TextStyle(color: Colors.redAccent)),
+        builder: (sheetContext, setSheetState) {
+          _sheetRefresh = () => setSheetState(() {});
+          return Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.graphic_eq_rounded, color: socialRideOrange),
+                    SizedBox(width: 8),
+                    Text('Il tuo audio allontanamento',
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                  ],
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  'Verrà riprodotto sul telefono degli altri quando ti stacchi '
+                  'dal gruppo. Max 6 secondi.',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                if (_isRecording) ...[
+                  _buildRecordingIndicator(),
+                  const SizedBox(height: 16),
+                ],
+                if (!_isRecording && _pendingRecordingPath != null) ...[
+                  _buildRecordingPreview(
+                    onConfirmed: () {
+                      if (sheetContext.mounted) {
+                        Navigator.of(sheetContext).pop();
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (_pendingRecordingPath == null) ...[
+                  ElevatedButton.icon(
+                    key: const Key('recordDropoffAudioButton'),
+                    onPressed: () async {
+                      await _toggleRecording();
+                      setSheetState(() {});
+                    },
+                    icon: Icon(_isRecording
+                        ? Icons.stop_circle_rounded
+                        : Icons.mic_rounded),
+                    label: Text(_isRecording
+                        ? 'Stop registrazione'
+                        : 'Registra in app'),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    key: const Key('uploadDropoffAudioButton'),
+                    onPressed: () async {
+                      await _pickAudioFile();
+                      if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                    },
+                    icon: const Icon(Icons.upload_file_rounded),
+                    label: const Text('Carica un file'),
+                  ),
+                ],
+                if (currentAudioUrl != null && _pendingRecordingPath == null) ...[
+                  const SizedBox(height: 10),
+                  TextButton.icon(
+                    key: const Key('removeDropoffAudioButton'),
+                    onPressed: () async {
+                      await _removeDropoffAudio();
+                      if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                    },
+                    icon: const Icon(Icons.delete_outline_rounded,
+                        color: Colors.redAccent),
+                    label: const Text('Rimuovi audio',
+                        style: TextStyle(color: Colors.redAccent)),
+                  ),
+                ],
               ],
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
-    );
+    ).whenComplete(() => _sheetRefresh = null);
   }
 
   Widget _buildLocationControl() {
@@ -414,6 +626,7 @@ class _RideScreenState extends State<RideScreen> {
         builder: (context, snapshot) {
           final riders = snapshot.data ?? [];
           _maybePlayDropoffAlerts(riders);
+          _ensureMarkerIcons(riders);
           return Column(
             children: [
               Container(
@@ -482,7 +695,7 @@ class _RideScreenState extends State<RideScreen> {
                     ),
                     myLocationEnabled: true,
                     myLocationButtonEnabled: true,
-                    markers: buildMarkers(riders),
+                    markers: buildMarkers(riders, icons: _markerIcons),
                   ),
                 ),
               ),
