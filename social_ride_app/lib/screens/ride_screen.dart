@@ -38,7 +38,8 @@ class RideScreen extends StatefulWidget {
 
 enum _LocationStatus { idle, requesting, sharing, denied }
 
-class _RideScreenState extends State<RideScreen> {
+class _RideScreenState extends State<RideScreen>
+    with SingleTickerProviderStateMixin {
   StreamSubscription? _positionSubscription;
   _LocationStatus _status = _LocationStatus.idle;
   DropoffAudioService? _audioServiceCache;
@@ -54,6 +55,11 @@ class _RideScreenState extends State<RideScreen> {
   String? _pendingRecordingPath;
   bool _isPreviewPlaying = false;
   VoidCallback? _sheetRefresh;
+  late final AnimationController _recordingPulseController =
+      AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 600),
+  );
 
   DropoffAudioService get _audioService =>
       widget.dropoffAudioService ??
@@ -91,6 +97,7 @@ class _RideScreenState extends State<RideScreen> {
   void dispose() {
     _positionSubscription?.cancel();
     _recordingTicker?.cancel();
+    _recordingPulseController.dispose();
     _alertPlayer.dispose();
     _previewPlayer.dispose();
     _recorderCache?.dispose();
@@ -157,6 +164,7 @@ class _RideScreenState extends State<RideScreen> {
       _pendingRecordingPath = null;
       _recordingElapsed = Duration.zero;
     });
+    _recordingPulseController.repeat(reverse: true);
     _recordingTicker?.cancel();
     _recordingTicker = Timer.periodic(const Duration(milliseconds: 100), (_) {
       if (!mounted) return;
@@ -173,6 +181,7 @@ class _RideScreenState extends State<RideScreen> {
 
   Future<void> _stopRecording() async {
     _recordingTicker?.cancel();
+    _recordingPulseController.stop();
     final path = await _recorder.stop();
     if (!mounted) return;
     setState(() {
@@ -256,28 +265,45 @@ class _RideScreenState extends State<RideScreen> {
   }
 
   Widget _buildRecordingIndicator() {
-    return Row(
+    final remaining =
+        dropoffAudioMaxDuration - _recordingElapsed > Duration.zero
+            ? dropoffAudioMaxDuration - _recordingElapsed
+            : Duration.zero;
+    final progress =
+        (_recordingElapsed.inMilliseconds / dropoffAudioMaxDuration.inMilliseconds)
+            .clamp(0.0, 1.0);
+    return Column(
       key: const Key('recordingIndicator'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0.3, end: 1),
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeInOut,
-          builder: (context, opacity, _) => Opacity(
-            opacity: opacity,
-            child: const Icon(Icons.fiber_manual_record_rounded,
-                color: Colors.redAccent, size: 16),
-          ),
-          onEnd: () => setState(() {}),
+        Row(
+          children: [
+            FadeTransition(
+              opacity: Tween(begin: 0.25, end: 1.0)
+                  .animate(_recordingPulseController),
+              child: const Icon(Icons.fiber_manual_record_rounded,
+                  color: Colors.redAccent, size: 16),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Sto registrando… ancora ${_formatElapsed(remaining)}',
+              key: const Key('recordingElapsedText'),
+              style: const TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 8),
-        Text(
-          'Sto registrando… ${_formatElapsed(_recordingElapsed)}',
-          key: const Key('recordingElapsedText'),
-          style: const TextStyle(
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: progress,
+            minHeight: 5,
+            backgroundColor: const Color(0xFFFFE0D6),
             color: Colors.redAccent,
-            fontWeight: FontWeight.w700,
-            fontSize: 13,
           ),
         ),
       ],
@@ -308,9 +334,13 @@ class _RideScreenState extends State<RideScreen> {
                 ),
                 onPressed: _togglePreviewPlayback,
               ),
-              const Expanded(
-                child: Text('Clip registrata: riascoltala prima di usarla',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+              Expanded(
+                child: Text(
+                  'Clip registrata (${_formatElapsed(_recordingElapsed)}): '
+                  'riascoltala prima di usarla',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 13),
+                ),
               ),
             ],
           ),
@@ -396,6 +426,12 @@ class _RideScreenState extends State<RideScreen> {
                 if (_pendingRecordingPath == null) ...[
                   ElevatedButton.icon(
                     key: const Key('recordDropoffAudioButton'),
+                    style: _isRecording
+                        ? ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent,
+                            foregroundColor: Colors.white,
+                          )
+                        : null,
                     onPressed: () async {
                       await _toggleRecording();
                       setSheetState(() {});
@@ -407,16 +443,20 @@ class _RideScreenState extends State<RideScreen> {
                         ? 'Stop registrazione'
                         : 'Registra in app'),
                   ),
-                  const SizedBox(height: 10),
-                  OutlinedButton.icon(
-                    key: const Key('uploadDropoffAudioButton'),
-                    onPressed: () async {
-                      await _pickAudioFile();
-                      if (sheetContext.mounted) Navigator.of(sheetContext).pop();
-                    },
-                    icon: const Icon(Icons.upload_file_rounded),
-                    label: const Text('Carica un file'),
-                  ),
+                  if (!_isRecording) ...[
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      key: const Key('uploadDropoffAudioButton'),
+                      onPressed: () async {
+                        await _pickAudioFile();
+                        if (sheetContext.mounted) {
+                          Navigator.of(sheetContext).pop();
+                        }
+                      },
+                      icon: const Icon(Icons.upload_file_rounded),
+                      label: const Text('Carica un file'),
+                    ),
+                  ],
                 ],
                 if (currentAudioUrl != null && _pendingRecordingPath == null) ...[
                   const SizedBox(height: 10),

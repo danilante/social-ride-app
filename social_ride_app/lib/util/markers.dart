@@ -29,31 +29,39 @@ Set<Marker> buildMarkers(
                       ? BitmapDescriptor.hueRed
                       : BitmapDescriptor.hueOrange,
                 ),
+            anchor: const Offset(0.5, 0.5),
           ))
       .toSet();
 }
 
 /// Renders a circular marker icon with the rider's initial letter, so the
 /// map shows who each dot is instead of an unlabeled colored pointer.
+///
+/// [renderSize] is the canvas resolution (kept high for a crisp image);
+/// [displaySize] is the logical on-map size in points, passed to
+/// [BitmapDescriptor.bytes] so the icon doesn't appear oversized regardless
+/// of how finely it was rendered.
 Future<BitmapDescriptor> createInitialMarkerIcon(
   String displayName,
   Color color, {
-  double size = 96,
+  double renderSize = 128,
+  double displaySize = 34,
 }) async {
   final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
   final recorder = ui.PictureRecorder();
   final canvas = Canvas(recorder);
 
   final circlePaint = Paint()..color = color;
-  canvas.drawCircle(Offset(size / 2, size / 2), size / 2, circlePaint);
+  canvas.drawCircle(
+      Offset(renderSize / 2, renderSize / 2), renderSize / 2, circlePaint);
 
   final borderPaint = Paint()
     ..color = Colors.white
     ..style = PaintingStyle.stroke
-    ..strokeWidth = size * 0.06;
+    ..strokeWidth = renderSize * 0.06;
   canvas.drawCircle(
-    Offset(size / 2, size / 2),
-    size / 2 - borderPaint.strokeWidth / 2,
+    Offset(renderSize / 2, renderSize / 2),
+    renderSize / 2 - borderPaint.strokeWidth / 2,
     borderPaint,
   );
 
@@ -62,7 +70,7 @@ Future<BitmapDescriptor> createInitialMarkerIcon(
       text: initial,
       style: TextStyle(
         color: Colors.white,
-        fontSize: size * 0.5,
+        fontSize: renderSize * 0.5,
         fontWeight: FontWeight.w800,
       ),
     ),
@@ -70,11 +78,17 @@ Future<BitmapDescriptor> createInitialMarkerIcon(
   )..layout();
   textPainter.paint(
     canvas,
-    Offset((size - textPainter.width) / 2, (size - textPainter.height) / 2),
+    Offset((renderSize - textPainter.width) / 2,
+        (renderSize - textPainter.height) / 2),
   );
 
   final picture = recorder.endRecording();
-  final image = await picture.toImage(size.toInt(), size.toInt());
+  final image =
+      await picture.toImage(renderSize.toInt(), renderSize.toInt());
   final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-  return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
+  return BitmapDescriptor.bytes(
+    bytes!.buffer.asUint8List(),
+    width: displaySize,
+    height: displaySize,
+  );
 }
