@@ -7,7 +7,11 @@ ThemeData buildSocialRideTheme() {
   final colorScheme = ColorScheme.fromSeed(
     seedColor: socialRideOrange,
     brightness: Brightness.light,
-  ).copyWith(secondary: socialRideInk);
+  ).copyWith(
+    primary: socialRideOrange,
+    onPrimary: Colors.white,
+    secondary: socialRideInk,
+  );
 
   return ThemeData(
     useMaterial3: true,
