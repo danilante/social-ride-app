@@ -259,6 +259,59 @@ void main() {
     );
   });
 
+  test('addTrackPoint records a point when called by the ride creator',
+      () async {
+    final firestore = FakeFirebaseFirestore();
+    final creatorRepo = RideRepository(
+      firestore: firestore,
+      currentUserId: () => 'user1',
+    );
+    final rideId = await creatorRepo.createRide('Giro', 'Mario');
+
+    await creatorRepo.addTrackPoint(rideId, 45.07, 7.68);
+
+    final points = await creatorRepo.streamTrack(rideId).first;
+    expect(points, hasLength(1));
+    expect(points.first.lat, 45.07);
+    expect(points.first.lng, 7.68);
+  });
+
+  test('addTrackPoint is a no-op when called by a rider who is not the '
+      'creator', () async {
+    final firestore = FakeFirebaseFirestore();
+    final creatorRepo = RideRepository(
+      firestore: firestore,
+      currentUserId: () => 'user1',
+    );
+    final rideId = await creatorRepo.createRide('Giro', 'Mario');
+    final joinerRepo = RideRepository(
+      firestore: firestore,
+      currentUserId: () => 'user2',
+    );
+    await joinerRepo.joinRide(rideId, 'Luca');
+
+    await joinerRepo.addTrackPoint(rideId, 45.07, 7.68);
+
+    final points = await creatorRepo.streamTrack(rideId).first;
+    expect(points, isEmpty);
+  });
+
+  test('streamTrack returns points ordered by recordedAt', () async {
+    final firestore = FakeFirebaseFirestore();
+    final creatorRepo = RideRepository(
+      firestore: firestore,
+      currentUserId: () => 'user1',
+    );
+    final rideId = await creatorRepo.createRide('Giro', 'Mario');
+
+    await creatorRepo.addTrackPoint(rideId, 1, 1);
+    await creatorRepo.addTrackPoint(rideId, 2, 2);
+    await creatorRepo.addTrackPoint(rideId, 3, 3);
+
+    final points = await creatorRepo.streamTrack(rideId).first;
+    expect(points.map((p) => p.lat), [1, 2, 3]);
+  });
+
   test('leaveRide removes the current user from the riders list', () async {
     final firestore = FakeFirebaseFirestore();
     final creatorRepo = RideRepository(

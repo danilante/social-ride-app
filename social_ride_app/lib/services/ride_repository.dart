@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:social_ride_app/models/ride.dart';
 import 'package:social_ride_app/models/rider_doc.dart';
+import 'package:social_ride_app/models/track_point.dart';
 
 const _rideCodeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -157,6 +158,30 @@ class RideRepository {
       'dropoffThresholdMeters': dropoffThresholdMeters,
       'dropoffDwellSeconds': dropoffDwellSeconds,
     }, SetOptions(merge: true));
+  }
+
+  /// Records a GPS point for the ride's traveled route. Only the ride
+  /// creator's points are recorded, so the map can draw a single trail
+  /// showing the route the group actually followed.
+  Future<void> addTrackPoint(String rideId, double lat, double lng) async {
+    final rideDoc = await firestore.collection('rides').doc(rideId).get();
+    if (rideDoc.data()?['creatorId'] != currentUserId()) return;
+    await firestore.collection('rides').doc(rideId).collection('track').add({
+      'lat': lat,
+      'lng': lng,
+      'recordedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Stream<List<TrackPoint>> streamTrack(String rideId) {
+    return firestore
+        .collection('rides')
+        .doc(rideId)
+        .collection('track')
+        .orderBy('recordedAt')
+        .snapshots()
+        .map((snap) =>
+            snap.docs.map((d) => TrackPoint.fromMap(d.data())).toList());
   }
 
   Stream<List<RiderDoc>> streamRiders(String rideId) {

@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:social_ride_app/models/rider_doc.dart';
+import 'package:social_ride_app/models/track_point.dart';
 
 /// Cache key for a rider's marker icon: changes when the rider's state
 /// (in group / dropped off) or displayName changes, so a new icon is
@@ -34,6 +35,21 @@ Set<Marker> buildMarkers(
             anchor: const Offset(0.5, 0.5),
           ))
       .toSet();
+}
+
+/// Builds the red trail showing the route the ride's creator has traveled,
+/// so a rider who gets separated from the group can see which road was
+/// taken.
+Set<Polyline> buildTrackPolyline(List<TrackPoint> points) {
+  if (points.length < 2) return {};
+  return {
+    Polyline(
+      polylineId: const PolylineId('creatorTrack'),
+      points: points.map((p) => LatLng(p.lat, p.lng)).toList(),
+      color: Colors.redAccent,
+      width: 4,
+    ),
+  };
 }
 
 /// Renders a circular marker icon with the rider's initial letter, so the

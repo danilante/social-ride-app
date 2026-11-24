@@ -1,9 +1,32 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:social_ride_app/models/rider_doc.dart';
+import 'package:social_ride_app/models/track_point.dart';
 import 'package:social_ride_app/util/markers.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('buildTrackPolyline returns empty set for fewer than 2 points', () {
+    expect(buildTrackPolyline([]), isEmpty);
+    expect(buildTrackPolyline([TrackPoint(lat: 1, lng: 1)]), isEmpty);
+  });
+
+  test('buildTrackPolyline builds a single red polyline through all points',
+      () {
+    final points = [
+      TrackPoint(lat: 1, lng: 1),
+      TrackPoint(lat: 2, lng: 2),
+      TrackPoint(lat: 3, lng: 3),
+    ];
+
+    final polylines = buildTrackPolyline(points);
+
+    expect(polylines, hasLength(1));
+    final polyline = polylines.first;
+    expect(polyline.color, Colors.redAccent);
+    expect(polyline.points.map((p) => p.latitude), [1, 2, 3]);
+  });
 
   test('buildMarkers skips riders without a position', () {
     final riders = [

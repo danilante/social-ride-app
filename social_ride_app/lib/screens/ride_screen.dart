@@ -6,6 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:social_ride_app/models/ride.dart';
 import 'package:social_ride_app/models/rider_doc.dart';
+import 'package:social_ride_app/models/track_point.dart';
 import 'package:social_ride_app/services/audio_duration_reader.dart';
 import 'package:social_ride_app/services/dropoff_alert_speaker.dart';
 import 'package:social_ride_app/services/dropoff_audio_service.dart';
@@ -168,6 +169,8 @@ class _RideScreenState extends State<RideScreen>
         widget.locationService.throttledPositionStream().listen((position) {
       widget.rideRepository
           .updateMyPosition(widget.rideId, position.latitude, position.longitude);
+      widget.rideRepository
+          .addTrackPoint(widget.rideId, position.latitude, position.longitude);
     });
   }
 
@@ -1005,14 +1008,21 @@ class _RideScreenState extends State<RideScreen>
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(0),
                   ),
-                  child: GoogleMap(
-                    initialCameraPosition: const CameraPosition(
-                      target: LatLng(45.0703, 7.6869),
-                      zoom: 12,
-                    ),
-                    myLocationEnabled: true,
-                    myLocationButtonEnabled: true,
-                    markers: buildMarkers(riders, icons: _markerIcons),
+                  child: StreamBuilder<List<TrackPoint>>(
+                    stream: widget.rideRepository.streamTrack(widget.rideId),
+                    builder: (context, trackSnapshot) {
+                      final trackPoints = trackSnapshot.data ?? [];
+                      return GoogleMap(
+                        initialCameraPosition: const CameraPosition(
+                          target: LatLng(45.0703, 7.6869),
+                          zoom: 12,
+                        ),
+                        myLocationEnabled: true,
+                        myLocationButtonEnabled: true,
+                        markers: buildMarkers(riders, icons: _markerIcons),
+                        polylines: buildTrackPolyline(trackPoints),
+                      );
+                    },
                   ),
                 ),
               ),
