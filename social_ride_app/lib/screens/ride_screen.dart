@@ -650,7 +650,7 @@ class _RideScreenState extends State<RideScreen>
         );
       case _LocationStatus.sharing:
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             color: const Color(0xFFE8F6EC),
             borderRadius: BorderRadius.circular(12),
@@ -658,14 +658,14 @@ class _RideScreenState extends State<RideScreen>
           child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.location_on_rounded, color: Color(0xFF2E9E53), size: 18),
-              SizedBox(width: 6),
+              Icon(Icons.location_on_rounded, color: Color(0xFF2E9E53), size: 24),
+              SizedBox(width: 8),
               Text(
                 'Condivisione posizione attiva',
                 style: TextStyle(
                   color: Color(0xFF1F7A3F),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
                 ),
               ),
             ],
@@ -678,10 +678,10 @@ class _RideScreenState extends State<RideScreen>
             const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.location_off_rounded, color: Colors.redAccent, size: 18),
-                SizedBox(width: 6),
+                Icon(Icons.location_off_rounded, color: Colors.redAccent, size: 24),
+                SizedBox(width: 8),
                 Text('Permesso posizione negato',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
               ],
             ),
             const SizedBox(height: 10),

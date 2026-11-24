@@ -427,4 +427,26 @@ void main() {
 
     expect(requested, isTrue);
   });
+
+  testWidgets('sharing status indicator uses a large, glance-readable icon',
+      (tester) async {
+    final locationService =
+        LocationService(checkPermission: () async => LocationPermission.whileInUse);
+
+    await tester.pumpWidget(MaterialApp(
+      home: RideScreen(
+        rideId: rideId,
+        rideRepository: repository,
+        locationService: locationService,
+        pushService: pushService,
+        alertSpeaker: alertSpeaker,
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('startRideButton')));
+    await tester.pumpAndSettle();
+
+    final icon = tester.widget<Icon>(find.byIcon(Icons.location_on_rounded));
+    expect(icon.size, greaterThanOrEqualTo(24));
+  });
 }
