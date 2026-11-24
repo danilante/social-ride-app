@@ -39,7 +39,12 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   void _loadRecentRide() {
     _recentRideStore.load().then((ride) {
       if (!mounted) return;
-      setState(() => _recentRide = ride);
+      setState(() {
+        _recentRide = ride;
+        if (ride != null && _nameController.text.trim().isEmpty) {
+          _nameController.text = ride.displayName;
+        }
+      });
     });
   }
 

@@ -264,4 +264,25 @@ void main() {
     expect(find.byType(HomeScreen), findsOneWidget);
     expect(find.textContaining('non trovat'), findsWidgets);
   });
+
+  testWidgets('prefills the name field from the last saved ride', (tester) async {
+    final firestore = FakeFirebaseFirestore();
+    final repository =
+        RideRepository(firestore: firestore, currentUserId: () => 'user1');
+    final store = _FakeRecentRideStore();
+    await store.save(const RecentRide(rideId: 'ABC123', displayName: 'Mario'));
+
+    await tester.pumpWidget(MaterialApp(
+      home: HomeScreen(
+        rideRepository: repository,
+        onRideReady: (_) {},
+        recentRideStore: store,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final field =
+        tester.widget<TextField>(find.byKey(const Key('displayNameField')));
+    expect(field.controller!.text, 'Mario');
+  });
 }
