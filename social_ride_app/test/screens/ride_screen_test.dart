@@ -195,7 +195,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('dropoffAudioSettingsButton')));
+    await tester.tap(find.byKey(const Key('dropoffAudioCard')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('defaultAudioNotice')), findsOneWidget);
@@ -517,5 +517,30 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Giro'), findsOneWidget);
+  });
+
+  testWidgets(
+      'dropoff audio card is a single compact row, not a full explainer block',
+      (tester) async {
+    final locationService =
+        LocationService(checkPermission: () async => LocationPermission.denied);
+
+    await tester.pumpWidget(MaterialApp(
+      home: RideScreen(
+        rideId: rideId,
+        rideRepository: repository,
+        locationService: locationService,
+        pushService: pushService,
+        alertSpeaker: alertSpeaker,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+          'Verrà riprodotto sul telefono degli altri quando ti stacchi dal gruppo'),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('dropoffAudioCard')), findsOneWidget);
   });
 }

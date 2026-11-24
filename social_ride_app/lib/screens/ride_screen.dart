@@ -892,51 +892,43 @@ class _RideScreenState extends State<RideScreen>
     final myAudioUrl = me.isEmpty ? null : me.first.dropoffAudioUrl;
     final myDisplayName = me.isEmpty ? '' : me.first.displayName;
     final hasAudio = myAudioUrl != null;
-    return Container(
+    return Padding(
       key: const Key('dropoffAudioCard'),
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: hasAudio ? const Color(0xFFFFF1EB) : const Color(0xFFF3F3F5),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: hasAudio ? socialRideOrange : const Color(0xFFE2E2E6),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            hasAudio ? Icons.graphic_eq_rounded : Icons.mic_none_rounded,
-            color: socialRideOrange,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  hasAudio
-                      ? 'Audio allontanamento impostato'
-                      : 'Registra un audio da mandare al gruppo quando ti stacchi',
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Verrà riprodotto sul telefono degli altri quando ti stacchi dal gruppo',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                ),
-              ],
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => _openDropoffAudioSheet(myAudioUrl, myDisplayName),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: hasAudio ? const Color(0xFFFFF1EB) : const Color(0xFFF3F3F5),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: hasAudio ? socialRideOrange : const Color(0xFFE2E2E6),
             ),
           ),
-          const SizedBox(width: 8),
-          TextButton(
-            key: const Key('dropoffAudioSettingsButton'),
-            onPressed: () => _openDropoffAudioSheet(myAudioUrl, myDisplayName),
-            child: Text(hasAudio ? 'Modifica' : 'Registra'),
+          child: Row(
+            children: [
+              Icon(
+                hasAudio ? Icons.graphic_eq_rounded : Icons.mic_none_rounded,
+                color: socialRideOrange,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  hasAudio
+                      ? 'Audio allontanamento impostato'
+                      : 'Nessun audio allontanamento: tocca per registrarne uno',
+                  style:
+                      const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded,
+                  color: Colors.grey.shade500, size: 20),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
