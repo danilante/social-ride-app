@@ -449,4 +449,26 @@ void main() {
     final icon = tester.widget<Icon>(find.byIcon(Icons.location_on_rounded));
     expect(icon.size, greaterThanOrEqualTo(24));
   });
+
+  testWidgets('tapping a rider chip centers the map on that rider',
+      (tester) async {
+    await repository.updateMyPosition(rideId, 46.0, 8.0);
+    final locationService =
+        LocationService(checkPermission: () async => LocationPermission.denied);
+
+    await tester.pumpWidget(MaterialApp(
+      home: RideScreen(
+        rideId: rideId,
+        rideRepository: repository,
+        locationService: locationService,
+        pushService: pushService,
+        alertSpeaker: alertSpeaker,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('riderChip_user1')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('riderChip_user1')));
+    await tester.pumpAndSettle();
+  });
 }

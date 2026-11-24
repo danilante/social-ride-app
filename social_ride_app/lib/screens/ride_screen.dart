@@ -70,6 +70,7 @@ class _RideScreenState extends State<RideScreen>
     duration: const Duration(milliseconds: 600),
   );
   LatLng? _initialCameraTarget;
+  GoogleMapController? _mapController;
 
   DropoffAudioService get _audioService =>
       widget.dropoffAudioService ??
@@ -190,7 +191,16 @@ class _RideScreenState extends State<RideScreen>
     _alertPlayer.dispose();
     _previewPlayer.dispose();
     _recorderCache?.dispose();
+    _mapController?.dispose();
     super.dispose();
+  }
+
+  void _centerMapOn(RiderDoc rider) {
+    final controller = _mapController;
+    if (controller == null || rider.lat == null || rider.lng == null) return;
+    controller.animateCamera(
+      CameraUpdate.newLatLng(LatLng(rider.lat!, rider.lng!)),
+    );
   }
 
   /// Generates and caches a colored, initial-letter marker icon per rider so
@@ -709,23 +719,30 @@ class _RideScreenState extends State<RideScreen>
           spacing: 8,
           runSpacing: 4,
           children: riders
-              .map((r) => Chip(
-                    avatar: CircleAvatar(
-                      radius: 11,
-                      backgroundColor: r.state == RiderState.droppedOff
-                          ? Colors.redAccent
-                          : socialRideOrange,
-                      child: Text(
-                        r.displayName.isNotEmpty
-                            ? r.displayName[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700),
+              .map((r) => InkWell(
+                    key: Key('riderChip_${r.userId}'),
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: r.lat != null && r.lng != null
+                        ? () => _centerMapOn(r)
+                        : null,
+                    child: Chip(
+                      avatar: CircleAvatar(
+                        radius: 11,
+                        backgroundColor: r.state == RiderState.droppedOff
+                            ? Colors.redAccent
+                            : socialRideOrange,
+                        child: Text(
+                          r.displayName.isNotEmpty
+                              ? r.displayName[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700),
+                        ),
                       ),
+                      label: Text(r.displayName),
                     ),
-                    label: Text(r.displayName),
                   ))
               .toList(),
         ),
@@ -1025,6 +1042,8 @@ class _RideScreenState extends State<RideScreen>
                               const LatLng(45.0703, 7.6869),
                           zoom: 12,
                         ),
+                        onMapCreated: (controller) =>
+                            _mapController = controller,
                         myLocationEnabled: true,
                         myLocationButtonEnabled: true,
                         markers: buildMarkers(riders, icons: _markerIcons),
