@@ -83,6 +83,38 @@ void main() {
     expect(find.byKey(const Key('displayNameField')), findsOneWidget);
   });
 
+  testWidgets(
+      'after creating a ride and going back, the home screen offers to continue it',
+      (tester) async {
+    final firestore = FakeFirebaseFirestore();
+    final repository =
+        RideRepository(firestore: firestore, currentUserId: () => 'user1');
+
+    await tester.pumpWidget(SocialRideApp(
+      rideRepository: repository,
+      locationServiceFactory: () =>
+          LocationService(checkPermission: () async => LocationPermission.denied),
+      pushServiceFactory: (rideRepository) => PushService(
+        tokenProvider: _FakeTokenProvider(),
+        rideRepository: rideRepository,
+      ),
+      recentRideStore: _FakeRecentRideStore(),
+      audioAlertSession: _FakeAudioAlertSession(),
+      volumeNoticeStore: _FakeVolumeNoticeStore(),
+    ));
+
+    await tester.enterText(find.byKey(const Key('displayNameField')), 'Mario');
+    await tester.enterText(find.byKey(const Key('rideNameField')), 'Giro');
+    await tester.tap(find.byKey(const Key('createRideButton')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('recentRideCard')), findsOneWidget);
+    expect(find.byKey(const Key('continueRecentRideButton')), findsOneWidget);
+  });
+
   testWidgets('shows the silent-mode alert notice once, on first launch',
       (tester) async {
     final firestore = FakeFirebaseFirestore();

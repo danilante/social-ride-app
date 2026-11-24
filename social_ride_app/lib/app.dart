@@ -34,6 +34,7 @@ class SocialRideApp extends StatefulWidget {
 
 class _SocialRideAppState extends State<SocialRideApp> {
   final _navigatorKey = GlobalKey<NavigatorState>();
+  final _routeObserver = RouteObserver<ModalRoute<void>>();
 
   AudioAlertSession get _audioAlertSession =>
       widget.audioAlertSession ?? DeviceAudioAlertSession();
@@ -105,11 +106,13 @@ class _SocialRideAppState extends State<SocialRideApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: _navigatorKey,
+      navigatorObservers: [_routeObserver],
       theme: buildSocialRideTheme(),
       home: HomeScreen(
         rideRepository: widget.rideRepository,
         onRideReady: _openRide,
         recentRideStore: widget.recentRideStore,
+        routeObserver: _routeObserver,
       ),
     );
   }

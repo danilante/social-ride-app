@@ -7,19 +7,21 @@ class HomeScreen extends StatefulWidget {
   final RideRepository rideRepository;
   final void Function(String rideId) onRideReady;
   final RecentRideStore? recentRideStore;
+  final RouteObserver<ModalRoute<void>>? routeObserver;
 
   const HomeScreen({
     super.key,
     required this.rideRepository,
     required this.onRideReady,
     this.recentRideStore,
+    this.routeObserver,
   });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with RouteAware {
   final _nameController = TextEditingController();
   final _rideNameController = TextEditingController();
   final _rideCodeController = TextEditingController();
@@ -31,10 +33,34 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _loadRecentRide();
+  }
+
+  void _loadRecentRide() {
     _recentRideStore.load().then((ride) {
-      if (!mounted || ride == null) return;
+      if (!mounted) return;
       setState(() => _recentRide = ride);
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    widget.routeObserver?.subscribe(this, ModalRoute.of(context)!);
+  }
+
+  @override
+  void dispose() {
+    widget.routeObserver?.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // Returning here from a pushed route (e.g. the ride screen's back
+    // button): the recent ride on disk may have changed since the initial
+    // load, so refresh it rather than keep showing stale state.
+    _loadRecentRide();
   }
 
   bool _requireName() {
