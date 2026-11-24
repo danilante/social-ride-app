@@ -953,7 +953,13 @@ class _RideScreenState extends State<RideScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ride in corso'),
+        title: StreamBuilder<Ride>(
+          stream: widget.rideRepository.streamRide(widget.rideId),
+          builder: (context, snapshot) {
+            final name = snapshot.data?.name;
+            return Text(name == null || name.isEmpty ? 'Ride in corso' : name);
+          },
+        ),
         actions: [
           StreamBuilder<Ride>(
             stream: widget.rideRepository.streamRide(widget.rideId),

@@ -499,4 +499,23 @@ void main() {
 
     expect(find.byKey(const Key('centerOnDroppedRider_user1')), findsOneWidget);
   });
+
+  testWidgets('shows the ride name in the app bar instead of a generic title',
+      (tester) async {
+    final locationService =
+        LocationService(checkPermission: () async => LocationPermission.denied);
+
+    await tester.pumpWidget(MaterialApp(
+      home: RideScreen(
+        rideId: rideId,
+        rideRepository: repository,
+        locationService: locationService,
+        pushService: pushService,
+        alertSpeaker: alertSpeaker,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Giro'), findsOneWidget);
+  });
 }
