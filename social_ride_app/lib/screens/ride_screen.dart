@@ -69,6 +69,7 @@ class _RideScreenState extends State<RideScreen>
     vsync: this,
     duration: const Duration(milliseconds: 600),
   );
+  LatLng? _initialCameraTarget;
 
   DropoffAudioService get _audioService =>
       widget.dropoffAudioService ??
@@ -96,6 +97,12 @@ class _RideScreenState extends State<RideScreen>
         const SnackBar(content: Text('La ride è stata terminata dal creatore')),
       );
       Navigator.of(context).popUntil((route) => route.isFirst);
+    });
+    widget.locationService.getCurrentPosition().then((position) {
+      if (!mounted || position == null) return;
+      setState(() {
+        _initialCameraTarget = LatLng(position.latitude, position.longitude);
+      });
     });
   }
 
@@ -1013,8 +1020,9 @@ class _RideScreenState extends State<RideScreen>
                     builder: (context, trackSnapshot) {
                       final trackPoints = trackSnapshot.data ?? [];
                       return GoogleMap(
-                        initialCameraPosition: const CameraPosition(
-                          target: LatLng(45.0703, 7.6869),
+                        initialCameraPosition: CameraPosition(
+                          target: _initialCameraTarget ??
+                              const LatLng(45.0703, 7.6869),
                           zoom: 12,
                         ),
                         myLocationEnabled: true,

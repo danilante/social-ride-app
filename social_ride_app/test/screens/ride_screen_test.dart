@@ -391,4 +391,40 @@ void main() {
 
     expect(find.textContaining('terminata dal creatore'), findsOneWidget);
   });
+
+  testWidgets('requests current position on load to center the map',
+      (tester) async {
+    var requested = false;
+    final locationService = LocationService(
+      checkPermission: () async => LocationPermission.whileInUse,
+      getCurrentPositionFn: () async {
+        requested = true;
+        return Position(
+          latitude: 41.9,
+          longitude: 12.5,
+          timestamp: DateTime.now(),
+          accuracy: 1,
+          altitude: 0,
+          altitudeAccuracy: 1,
+          heading: 0,
+          headingAccuracy: 1,
+          speed: 0,
+          speedAccuracy: 0,
+        );
+      },
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: RideScreen(
+        rideId: rideId,
+        rideRepository: repository,
+        locationService: locationService,
+        pushService: pushService,
+        alertSpeaker: alertSpeaker,
+      ),
+    ));
+    await tester.pump();
+
+    expect(requested, isTrue);
+  });
 }

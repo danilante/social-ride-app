@@ -73,4 +73,34 @@ void main() {
     await subscription.cancel();
     await controller.close();
   });
+
+  test('getCurrentPosition returns null when permission denied', () async {
+    final service = LocationService(
+      checkPermission: () async => LocationPermission.denied,
+      requestPermission: () async => LocationPermission.denied,
+    );
+    final position = await service.getCurrentPosition();
+    expect(position, isNull);
+  });
+
+  test('getCurrentPosition returns a position when permission granted', () async {
+    final fakePosition = Position(
+      latitude: 45.07,
+      longitude: 7.68,
+      timestamp: DateTime.now(),
+      accuracy: 1,
+      altitude: 0,
+      altitudeAccuracy: 1,
+      heading: 0,
+      headingAccuracy: 1,
+      speed: 0,
+      speedAccuracy: 0,
+    );
+    final service = LocationService(
+      checkPermission: () async => LocationPermission.whileInUse,
+      getCurrentPositionFn: () async => fakePosition,
+    );
+    final position = await service.getCurrentPosition();
+    expect(position, fakePosition);
+  });
 }
