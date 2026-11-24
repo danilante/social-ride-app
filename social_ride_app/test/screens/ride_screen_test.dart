@@ -471,4 +471,32 @@ void main() {
     await tester.tap(find.byKey(const Key('riderChip_user1')));
     await tester.pumpAndSettle();
   });
+
+  testWidgets(
+      'dropoff banner has a button to center the map on the dropped rider',
+      (tester) async {
+    await repository.updateMyPosition(rideId, 46.0, 8.0);
+    await firestore
+        .collection('rides')
+        .doc(rideId)
+        .collection('riders')
+        .doc('user1')
+        .update({'state': 'dropped_off'});
+    final locationService =
+        LocationService(checkPermission: () async => LocationPermission.denied);
+
+    await tester.pumpWidget(MaterialApp(
+      home: RideScreen(
+        rideId: rideId,
+        rideRepository: RideRepository(
+            firestore: firestore, currentUserId: () => 'user2'),
+        locationService: locationService,
+        pushService: pushService,
+        alertSpeaker: alertSpeaker,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('centerOnDroppedRider_user1')), findsOneWidget);
+  });
 }

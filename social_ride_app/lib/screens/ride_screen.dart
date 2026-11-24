@@ -767,28 +767,37 @@ class _RideScreenState extends State<RideScreen>
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFFFC7B8)),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.warning_rounded, color: Color(0xFFD9461E)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: droppedOff.map((r) {
+          final hasPosition = r.lat != null && r.lng != null;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: droppedOff
-                  .map((r) => Text(
-                        '${r.displayName} si è staccato dal gruppo'
-                        '${r.distanceFromGroupMeters != null ? " (~${r.distanceFromGroupMeters!.round()}m)" : ""}',
-                        style: const TextStyle(
-                          color: Color(0xFFD9461E),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ))
-                  .toList(),
+              children: [
+                const Icon(Icons.warning_rounded, color: Color(0xFFD9461E)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '${r.displayName} si è staccato dal gruppo'
+                    '${r.distanceFromGroupMeters != null ? " (~${r.distanceFromGroupMeters!.round()}m)" : ""}',
+                    style: const TextStyle(
+                      color: Color(0xFFD9461E),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (hasPosition)
+                  TextButton(
+                    key: Key('centerOnDroppedRider_${r.userId}'),
+                    onPressed: () => _centerMapOn(r),
+                    child: const Text('Centra mappa'),
+                  ),
+              ],
             ),
-          ),
-        ],
+          );
+        }).toList(),
       ),
     );
   }
