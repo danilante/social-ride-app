@@ -12,6 +12,7 @@ import 'package:social_ride_app/services/audio_duration_reader.dart';
 import 'package:social_ride_app/services/dropoff_alert_speaker.dart';
 import 'package:social_ride_app/services/dropoff_audio_service.dart';
 import 'package:social_ride_app/services/dropoff_recorder.dart';
+import 'package:social_ride_app/services/battery_service.dart';
 import 'package:social_ride_app/services/location_service.dart';
 import 'package:social_ride_app/services/position_queue.dart';
 import 'package:social_ride_app/services/push_service.dart';
@@ -19,6 +20,9 @@ import 'package:social_ride_app/services/ride_repository.dart';
 import 'package:social_ride_app/theme.dart';
 import 'package:social_ride_app/util/geo.dart';
 import 'package:social_ride_app/util/markers.dart';
+import 'package:social_ride_app/widgets/dropoff_alert_banner.dart';
+import 'package:social_ride_app/widgets/location_sharing_control.dart';
+import 'package:social_ride_app/widgets/ride_settings_sheet.dart';
 
 class RideScreen extends StatefulWidget {
   final String rideId;
@@ -28,6 +32,7 @@ class RideScreen extends StatefulWidget {
   final DropoffAudioService? dropoffAudioService;
   final DropoffRecorder? recorder;
   final DropoffAlertSpeaker? alertSpeaker;
+  final BatteryService? batteryService;
 
   const RideScreen({
     super.key,
@@ -38,19 +43,19 @@ class RideScreen extends StatefulWidget {
     this.dropoffAudioService,
     this.recorder,
     this.alertSpeaker,
+    this.batteryService,
   });
 
   @override
   State<RideScreen> createState() => _RideScreenState();
 }
 
-enum _LocationStatus { idle, requesting, sharing, denied }
-
 class _RideScreenState extends State<RideScreen> {
   StreamSubscription? _positionSubscription;
   StreamSubscription<Ride>? _rideStatusSubscription;
   bool _hasLeftOrEnded = false;
-  _LocationStatus _status = _LocationStatus.idle;
+  LocationSharingStatus _status = LocationSharingStatus.idle;
+  static const _lowBatteryThresholdPercent = 20;
   DropoffAudioService? _audioServiceCache;
   DropoffRecorder? _recorderCache;
   DropoffAlertSpeaker? _alertSpeakerCache;
@@ -163,14 +168,31 @@ class _RideScreenState extends State<RideScreen> {
   }
 
   Future<void> _startSharingPosition() async {
-    setState(() => _status = _LocationStatus.requesting);
+    setState(() => _status = LocationSharingStatus.requesting);
     final granted = await widget.locationService.ensurePermission();
     if (!mounted) return;
     if (!granted) {
-      setState(() => _status = _LocationStatus.denied);
+      setState(() => _status = LocationSharingStatus.denied);
       return;
     }
-    setState(() => _status = _LocationStatus.sharing);
+    setState(() => _status = LocationSharingStatus.sharing);
+
+    // Spec: warn when battery is under 20% so the rider can plug in / adjust.
+    final battery = widget.batteryService ?? BatteryService();
+    if (await battery.isBelow(_lowBatteryThresholdPercent) && mounted) {
+      final level = await battery.getBatteryLevel();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            level != null
+                ? 'Batteria al $level%. Con la condivisione GPS si scarica più in fretta.'
+                : 'Batteria bassa. Con la condivisione GPS si scarica più in fretta.',
+          ),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
+
     _positionSubscription = widget.locationService
         .throttledPositionStream(
           interval: const Duration(seconds: 10),
@@ -329,68 +351,10 @@ class _RideScreenState extends State<RideScreen> {
   }
 
   Widget _buildLocationControl() {
-    switch (_status) {
-      case _LocationStatus.idle:
-        return ElevatedButton.icon(
-          key: const Key('startRideButton'),
-          onPressed: _startSharingPosition,
-          icon: const Icon(Icons.play_arrow_rounded),
-          label: const Text('Avvia ride'),
-        );
-      case _LocationStatus.requesting:
-        return const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
-          child: SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(strokeWidth: 2.5),
-          ),
-        );
-      case _LocationStatus.sharing:
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE8F6EC),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.location_on_rounded, color: Color(0xFF2E9E53), size: 24),
-              SizedBox(width: 8),
-              Text(
-                'Condivisione posizione attiva',
-                style: TextStyle(
-                  color: Color(0xFF1F7A3F),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
-                ),
-              ),
-            ],
-          ),
-        );
-      case _LocationStatus.denied:
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.location_off_rounded, color: Colors.redAccent, size: 24),
-                SizedBox(width: 8),
-                Text('Permesso posizione negato',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-              ],
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton(
-              key: const Key('retryLocationButton'),
-              onPressed: _startSharingPosition,
-              child: const Text('Riprova'),
-            ),
-          ],
-        );
-    }
+    return LocationSharingControl(
+      status: _status,
+      onStartOrRetry: _startSharingPosition,
+    );
   }
 
   Widget _buildRidersSummary(List<RiderDoc> riders) {
@@ -439,137 +403,28 @@ class _RideScreenState extends State<RideScreen> {
   }
 
   Widget _buildDropoffAlert(List<RiderDoc> riders) {
-    final currentUserId = widget.rideRepository.currentUserId();
-    final droppedOff = riders
-        .where((r) =>
-            r.state == RiderState.droppedOff && r.userId != currentUserId)
-        .toList();
-    if (droppedOff.isEmpty) return const SizedBox.shrink();
-    return Container(
-      key: const Key('dropoffAlertBanner'),
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFE9E4),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFFC7B8)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: droppedOff.map((r) {
-          final hasPosition = r.lat != null && r.lng != null;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.warning_rounded, color: Color(0xFFD9461E)),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    '${r.displayName} si è staccato dal gruppo'
-                    '${r.distanceFromGroupMeters != null ? " (~${r.distanceFromGroupMeters!.round()}m)" : ""}',
-                    style: const TextStyle(
-                      color: Color(0xFFD9461E),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                if (hasPosition)
-                  TextButton(
-                    key: Key('centerOnDroppedRider_${r.userId}'),
-                    onPressed: () => _centerMapOn(r),
-                    child: const Text('Centra mappa'),
-                  ),
-              ],
-            ),
-          );
-        }).toList(),
-      ),
+    return DropoffAlertBanner(
+      riders: riders,
+      currentUserId: widget.rideRepository.currentUserId(),
+      onCenterMap: _centerMapOn,
     );
   }
 
   void _openRideSettingsSheet(Ride ride) {
-    double meters = ride.dropoffThresholdMeters;
-    int seconds = ride.dropoffDwellSeconds;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (sheetContext, setSheetState) {
-          return SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              24, 24, 24, 24 + MediaQuery.of(sheetContext).viewInsets.bottom),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.tune_rounded, color: socialRideOrange),
-                    SizedBox(width: 8),
-                    Text('Impostazioni ride',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Decidi quanto deve allontanarsi e per quanto tempo un rider '
-                  'prima di essere segnalato come staccato dal gruppo.',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                ),
-                const SizedBox(height: 20),
-                Text('Distanza di stacco: ${meters.round()}m',
-                    key: const Key('dropoffThresholdLabel'),
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
-                Slider(
-                  key: const Key('dropoffThresholdSlider'),
-                  value: meters,
-                  min: 50,
-                  max: 1000,
-                  divisions: 19,
-                  activeColor: socialRideOrange,
-                  label: '${meters.round()}m',
-                  onChanged: (v) => setSheetState(() => meters = v),
-                ),
-                const SizedBox(height: 12),
-                Text('Tempo prima dello stacco: ${seconds}s',
-                    key: const Key('dropoffDwellLabel'),
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
-                Slider(
-                  key: const Key('dropoffDwellSlider'),
-                  value: seconds.toDouble(),
-                  min: 10,
-                  max: 300,
-                  divisions: 29,
-                  activeColor: socialRideOrange,
-                  label: '${seconds}s',
-                  onChanged: (v) => setSheetState(() => seconds = v.round()),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  key: const Key('saveRideSettingsButton'),
-                  onPressed: () async {
-                    await widget.rideRepository.updateDropoffSettings(
-                      widget.rideId,
-                      dropoffThresholdMeters: meters,
-                      dropoffDwellSeconds: seconds,
-                    );
-                    if (sheetContext.mounted) {
-                      Navigator.of(sheetContext).pop();
-                    }
-                  },
-                  icon: const Icon(Icons.check_rounded),
-                  label: const Text('Salva impostazioni'),
-                ),
-              ],
-            ),
-          );
-        },
+      builder: (_) => RideSettingsSheet(
+        initialThresholdMeters: ride.dropoffThresholdMeters,
+        initialDwellSeconds: ride.dropoffDwellSeconds,
+        onSave: (meters, seconds) => widget.rideRepository.updateDropoffSettings(
+          widget.rideId,
+          dropoffThresholdMeters: meters,
+          dropoffDwellSeconds: seconds,
+        ),
       ),
     );
   }

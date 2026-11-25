@@ -76,7 +76,25 @@ async function handleRiderPositionWritten(db, messaging, rideId, userId) {
     // Only write when something the UI or future evaluations care about
     // actually changed. Avoids the previous almost-always-write behaviour
     // caused by floating-point distance noise on every position update.
-    if (stateChanged || thresholdSinceChanged || distanceMeaningfullyChanged) {
+    const shouldWrite =
+      stateChanged || thresholdSinceChanged || distanceMeaningfullyChanged;
+
+    // Structured log for cost monitoring in Cloud Logging (jsonPayload filters).
+    console.log(
+      JSON.stringify({
+        type: 'dropoff_eval',
+        rideId,
+        userId,
+        state: result.state,
+        previousState,
+        stateChanged,
+        shouldWrite,
+        distanceM: Math.round(result.distanceFromGroupMeters),
+        ridersInView: others.length + 1,
+      })
+    );
+
+    if (shouldWrite) {
       await db
           .collection('rides')
           .doc(rideId)
