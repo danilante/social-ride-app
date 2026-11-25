@@ -34,6 +34,10 @@ class RideScreen extends StatefulWidget {
   final DropoffAlertSpeaker? alertSpeaker;
   final BatteryService? batteryService;
 
+  /// When true (default), GPS sharing starts as soon as the screen opens.
+  /// Tests can set false to exercise the manual "Avvia ride" control.
+  final bool autoStartLocation;
+
   const RideScreen({
     super.key,
     required this.rideId,
@@ -44,6 +48,7 @@ class RideScreen extends StatefulWidget {
     this.recorder,
     this.alertSpeaker,
     this.batteryService,
+    this.autoStartLocation = true,
   });
 
   @override
@@ -108,6 +113,14 @@ class _RideScreenState extends State<RideScreen> {
         _initialCameraTarget = LatLng(position.latitude, position.longitude);
       });
     });
+    // UX for cycling: start sharing as soon as you enter the ride screen
+    // (phone goes in the jersey pocket; no extra tap required).
+    if (widget.autoStartLocation) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _status != LocationSharingStatus.idle) return;
+        _startSharingPosition();
+      });
+    }
   }
 
   Future<bool> _confirmDestructive({
@@ -210,8 +223,10 @@ class _RideScreenState extends State<RideScreen> {
       await widget.rideRepository.updateMyPosition(widget.rideId, lat, lng);
       // Successful write → flush any buffered offline points.
       await _flushOfflineQueue();
+      _notifyOfflineQueueChanged();
     } catch (_) {
       _offlineQueue.enqueue(lat, lng);
+      _notifyOfflineQueueChanged();
     }
 
     // 2. Track sampling: only the creator records the trail, and only when
@@ -230,6 +245,10 @@ class _RideScreenState extends State<RideScreen> {
     }
   }
 
+  void _notifyOfflineQueueChanged() {
+    if (mounted) setState(() {});
+  }
+
   Future<void> _flushOfflineQueue() async {
     while (_offlineQueue.isNotEmpty) {
       final p = _offlineQueue.dequeue();
@@ -243,6 +262,37 @@ class _RideScreenState extends State<RideScreen> {
         break;
       }
     }
+  }
+
+  Widget _buildOfflineBanner() {
+    if (_offlineQueue.isEmpty) return const SizedBox.shrink();
+    return Container(
+      key: const Key('offlineQueueBanner'),
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF6E5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFD89A)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.cloud_off_rounded, color: Color(0xFFB86E00), size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Offline — ${_offlineQueue.length} posizioni in coda',
+              style: const TextStyle(
+                color: Color(0xFF8A5200),
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -577,6 +627,7 @@ class _RideScreenState extends State<RideScreen> {
               const SizedBox(height: 12),
               _buildDropoffAudioCard(riders),
               _buildDropoffAlert(riders),
+              _buildOfflineBanner(),
               Expanded(
                 child: ClipRRect(
                   borderRadius: const BorderRadius.vertical(
@@ -586,18 +637,58 @@ class _RideScreenState extends State<RideScreen> {
                     stream: widget.rideRepository.streamTrack(widget.rideId),
                     builder: (context, trackSnapshot) {
                       final trackPoints = trackSnapshot.data ?? [];
-                      return GoogleMap(
-                        initialCameraPosition: CameraPosition(
-                          target: _initialCameraTarget ??
-                              const LatLng(45.0703, 7.6869),
-                          zoom: 12,
-                        ),
-                        onMapCreated: (controller) =>
-                            _mapController = controller,
-                        myLocationEnabled: true,
-                        myLocationButtonEnabled: true,
-                        markers: buildMarkers(riders, icons: _markerIcons),
-                        polylines: buildTrackPolyline(trackPoints),
+                      final hasLivePositions = riders.any(
+                        (r) => r.lat != null && r.lng != null,
+                      );
+                      return Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          GoogleMap(
+                            initialCameraPosition: CameraPosition(
+                              target: _initialCameraTarget ??
+                                  const LatLng(45.0703, 7.6869),
+                              zoom: 12,
+                            ),
+                            onMapCreated: (controller) =>
+                                _mapController = controller,
+                            myLocationEnabled: true,
+                            myLocationButtonEnabled: true,
+                            markers:
+                                buildMarkers(riders, icons: _markerIcons),
+                            polylines: buildTrackPolyline(trackPoints),
+                          ),
+                          if (!hasLivePositions)
+                            IgnorePointer(
+                              child: Center(
+                                child: Container(
+                                  key: const Key('mapEmptyState'),
+                                  margin: const EdgeInsets.all(24),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.92),
+                                    borderRadius: BorderRadius.circular(14),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.08),
+                                        blurRadius: 12,
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Text(
+                                    'In attesa delle posizioni del gruppo…',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: socialRideInk,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       );
                     },
                   ),

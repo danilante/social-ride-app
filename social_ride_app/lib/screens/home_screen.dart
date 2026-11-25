@@ -215,23 +215,39 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               ),
               const SizedBox(height: 6),
               Text(
-                'Pedalate insieme, senza perdervi di vista.',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                'Crea una ride o unisciti con un codice.\n'
+                'Posizione live e avviso se qualcuno si stacca.',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 14,
+                  height: 1.35,
+                ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
               if (_recentRide != null) ...[
                 _buildRecentRideCard(_recentRide!),
                 const SizedBox(height: 16),
               ],
+              Text(
+                'Chi sei',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey.shade700,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 8),
               TextField(
                 key: const Key('displayNameField'),
                 controller: _nameController,
+                textCapitalization: TextCapitalization.words,
                 decoration: const InputDecoration(
                   labelText: 'Il tuo nome',
+                  hintText: 'Come ti vedranno gli altri',
                   prefixIcon: Icon(Icons.person_outline_rounded),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               _sectionCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -244,6 +260,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                         Text('Crea una nuova ride',
                             style: TextStyle(fontWeight: FontWeight.w700)),
                       ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Genera un codice da condividere con il gruppo.',
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                     ),
                     const SizedBox(height: 14),
                     TextField(
@@ -277,6 +298,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                             style: TextStyle(fontWeight: FontWeight.w700)),
                       ],
                     ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Inserisci il codice a 6 caratteri che ti hanno mandato.',
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                    ),
                     const SizedBox(height: 14),
                     TextField(
                       key: const Key('rideCodeField'),
@@ -284,6 +310,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                       textCapitalization: TextCapitalization.characters,
                       decoration: const InputDecoration(
                         labelText: 'Codice ride',
+                        hintText: 'Es. AB3K9P',
                         prefixIcon: Icon(Icons.tag_outlined),
                       ),
                     ),

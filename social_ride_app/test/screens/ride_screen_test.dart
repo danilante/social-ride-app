@@ -53,6 +53,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: repository,
         locationService: locationService,
@@ -81,6 +82,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: repository,
         locationService: locationService,
@@ -130,6 +132,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: repository,
         locationService: locationService,
@@ -166,6 +169,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: joinerRepo,
         locationService: locationService,
@@ -186,6 +190,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: repository,
         locationService: locationService,
@@ -223,6 +228,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: repository,
         locationService: locationService,
@@ -243,6 +249,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: repository,
         locationService: locationService,
@@ -263,6 +270,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: repository,
         locationService: locationService,
@@ -287,6 +295,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: repository,
         locationService: locationService,
@@ -309,6 +318,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: repository,
         locationService: locationService,
@@ -340,6 +350,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: joinerRepo,
         locationService: locationService,
@@ -377,6 +388,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: joinerRepo,
         locationService: locationService,
@@ -416,6 +428,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: repository,
         locationService: locationService,
@@ -435,6 +448,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: repository,
         locationService: locationService,
@@ -458,6 +472,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: repository,
         locationService: locationService,
@@ -487,6 +502,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: RideRepository(
             firestore: firestore, currentUserId: () => 'user2'),
@@ -507,6 +523,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: repository,
         locationService: locationService,
@@ -527,6 +544,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: repository,
         locationService: locationService,

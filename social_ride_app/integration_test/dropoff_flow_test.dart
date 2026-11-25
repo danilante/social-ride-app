@@ -68,6 +68,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: marioRepo,
         locationService:
@@ -132,6 +133,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
+        autoStartLocation: false,
         rideId: rideId,
         rideRepository: marioRepo,
         locationService:

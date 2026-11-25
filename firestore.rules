@@ -1,15 +1,31 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // True when the current user has already joined this ride (has a rider doc).
+    function isRideMember(rideId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/rides/$(rideId)/riders/$(request.auth.uid));
+    }
+
     match /rides/{rideId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null
-        && request.resource.data.creatorId == request.auth.uid;
+      // get: any signed-in user (needed to validate a join code before
+      // membership exists). list: denied so rides cannot be enumerated.
+      allow get: if isSignedIn();
+      allow list: if false;
+
+      allow create: if isSignedIn()
+        && request.resource.data.creatorId == request.auth.uid
+        && request.resource.data.status == 'active'
+        && request.resource.data.keys().hasAll(['name', 'creatorId', 'status']);
+
       // Only the creator can update a ride doc, and only for one of two
-      // narrow reasons — not to reassign ownership or rewrite the name:
-      // tune the drop-off thresholds (status unchanged), or end the ride
-      // (status flips to 'ended', everything else stays put).
-      allow update: if request.auth != null
+      // narrow reasons — tune drop-off thresholds, or end the ride.
+      allow update: if isSignedIn()
         && resource.data.creatorId == request.auth.uid
         && request.resource.data.creatorId == resource.data.creatorId
         && request.resource.data.name == resource.data.name
@@ -31,19 +47,33 @@ service cloud.firestore {
       allow delete: if false;
 
       match /riders/{userId} {
-        // Every rider in the ride can see everyone's position/state so the
-        // map and drop-off alerts work; only the rider themself can write
-        // their own doc.
-        allow read: if request.auth != null;
-        allow write: if request.auth != null && request.auth.uid == userId;
+        // Live positions are visible only to people already in the ride.
+        allow read: if isRideMember(rideId);
+
+        // Only the rider themself can write their own doc.
+        // Basic field hygiene: no spoofing another uid, reasonable lat/lng.
+        allow create: if isSignedIn()
+          && request.auth.uid == userId
+          && request.resource.data.keys().hasAny(['displayName', 'state']);
+        allow update: if isSignedIn()
+          && request.auth.uid == userId
+          && (!('lat' in request.resource.data)
+              || (request.resource.data.lat is number
+                  && request.resource.data.lat >= -90
+                  && request.resource.data.lat <= 90))
+          && (!('lng' in request.resource.data)
+              || (request.resource.data.lng is number
+                  && request.resource.data.lng >= -180
+                  && request.resource.data.lng <= 180));
+        allow delete: if isSignedIn() && request.auth.uid == userId;
       }
 
       match /track/{pointId} {
-        // The traveled-route trail is recorded from the creator's position
-        // only (one trail per ride), but every rider can see it.
-        allow read: if request.auth != null;
-        allow create: if request.auth != null
-          && request.auth.uid == get(/databases/$(database)/documents/rides/$(rideId)).data.creatorId;
+        // Trail is visible only to members; only the creator may append.
+        allow read: if isRideMember(rideId);
+        allow create: if isRideMember(rideId)
+          && request.auth.uid == get(/databases/$(database)/documents/rides/$(rideId)).data.creatorId
+          && request.resource.data.keys().hasAll(['lat', 'lng']);
         allow update: if false;
         allow delete: if false;
       }
