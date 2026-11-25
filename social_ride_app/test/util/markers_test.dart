@@ -12,6 +12,16 @@ void main() {
     expect(buildTrackPolyline([TrackPoint(lat: 1, lng: 1)]), isEmpty);
   });
 
+  test('buildTrackPolyline caps to kMaxTrackPolylinePoints', () {
+    final points = List.generate(
+      kMaxTrackPolylinePoints + 50,
+      (i) => TrackPoint(lat: 45.0 + i * 0.0001, lng: 7.0),
+    );
+    final polylines = buildTrackPolyline(points);
+    expect(polylines.length, 1);
+    expect(polylines.first.points.length, kMaxTrackPolylinePoints);
+  });
+
   test('buildTrackPolyline builds a single red polyline through all points',
       () {
     final points = [

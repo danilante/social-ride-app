@@ -1,35 +1,38 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:geolocator/geolocator.dart';
+import 'package:social_ride_app/services/ride_foreground_service.dart';
 import 'package:social_ride_app/util/geo.dart';
 
 class LocationService {
-  final Stream<Position> Function() positionStreamFactory;
+  final Stream<Position> Function({LocationSettings? locationSettings})
+      positionStreamFactory;
   final Future<LocationPermission> Function() _checkPermission;
   final Future<LocationPermission> Function() _requestPermission;
   final Future<Position> Function() _getCurrentPosition;
 
   LocationService({
-    Stream<Position> Function()? positionStreamFactory,
+    Stream<Position> Function({LocationSettings? locationSettings})?
+        positionStreamFactory,
     Future<LocationPermission> Function()? checkPermission,
     Future<LocationPermission> Function()? requestPermission,
     Future<Position> Function()? getCurrentPositionFn,
-  })  : positionStreamFactory =
-            positionStreamFactory ?? Geolocator.getPositionStream,
+  })  : positionStreamFactory = positionStreamFactory ??
+            (({LocationSettings? locationSettings}) =>
+                Geolocator.getPositionStream(
+                    locationSettings: locationSettings)),
         _checkPermission = checkPermission ?? Geolocator.checkPermission,
         _requestPermission = requestPermission ?? Geolocator.requestPermission,
         _getCurrentPosition =
             getCurrentPositionFn ?? Geolocator.getCurrentPosition;
 
-  /// Requests permission, preferring "always" (needed for background
-  /// tracking while the phone is in a jersey pocket). Falls back to
-  /// whileInUse if the platform / user only grants that.
   Future<bool> ensurePermission() async {
     LocationPermission permission = await _checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await _requestPermission();
     }
-    // On some platforms a second request can upgrade whileInUse → always.
     if (permission == LocationPermission.whileInUse) {
-      // Best-effort upgrade; ignore if the OS does not allow it.
       try {
         final upgraded = await _requestPermission();
         if (upgraded == LocationPermission.always) {
@@ -41,9 +44,6 @@ class LocationService {
         permission == LocationPermission.whileInUse;
   }
 
-  /// Best-effort current position for centering map on open. Returns
-  /// null (never throws) so missing permission or platform lookup
-  /// failure falls back to map's default camera.
   Future<Position?> getCurrentPosition() async {
     final permission = await _checkPermission();
     if (permission != LocationPermission.always &&
@@ -57,19 +57,18 @@ class LocationService {
     }
   }
 
-  /// Emits positions at most once every [interval], and only when the
-  /// rider has moved at least [minDistanceMeters] from the last emitted
-  /// point (or it is the first point). Both filters reduce Firestore
-  /// writes and Cloud Function invocations.
   Stream<Position> throttledPositionStream({
     Duration interval = const Duration(seconds: 10),
     double minDistanceMeters = 15,
+    String rideCode = '',
   }) {
     DateTime? lastEmittedAt;
     double? lastLat;
     double? lastLng;
 
-    return positionStreamFactory().where((position) {
+    final settings = _locationSettingsForPlatform(rideCode);
+
+    return positionStreamFactory(locationSettings: settings).where((position) {
       final now = position.timestamp;
       final timeOk = lastEmittedAt == null ||
           now.difference(lastEmittedAt!) >= interval;
@@ -88,5 +87,21 @@ class LocationService {
       }
       return false;
     });
+  }
+
+  LocationSettings? _locationSettingsForPlatform(String rideCode) {
+    if (kIsWeb) return null;
+    try {
+      if (Platform.isAndroid) {
+        return RideForegroundService.trackingSettings(rideCode: rideCode);
+      }
+      if (Platform.isIOS) {
+        return RideForegroundService.appleSettings();
+      }
+    } catch (_) {}
+    return const LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 10,
+    );
   }
 }

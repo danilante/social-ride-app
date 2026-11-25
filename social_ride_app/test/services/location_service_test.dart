@@ -51,14 +51,15 @@ void main() {
   test('throttledPositionStream only emits positions at least interval apart', () async {
     final controller = StreamController<Position>();
     final service = LocationService(
-      positionStreamFactory: () => controller.stream,
+      positionStreamFactory: ({LocationSettings? locationSettings}) =>
+          controller.stream,
     );
 
     final emitted = <Position>[];
     final subscription = service
         .throttledPositionStream(
           interval: const Duration(seconds: 10),
-          minDistanceMeters: 0, // disable distance filter for this test
+          minDistanceMeters: 0,
         )
         .listen(emitted.add);
 
@@ -81,7 +82,8 @@ void main() {
       () async {
     final controller = StreamController<Position>();
     final service = LocationService(
-      positionStreamFactory: () => controller.stream,
+      positionStreamFactory: ({LocationSettings? locationSettings}) =>
+          controller.stream,
     );
 
     final emitted = <Position>[];
@@ -93,12 +95,9 @@ void main() {
         .listen(emitted.add);
 
     final base = DateTime(2026, 1, 1, 12, 0, 0);
-    // First point always emitted
     controller.add(_fakePosition(base, lat: 45.0, lng: 7.0));
-    // ~11 m north (~0.0001 deg lat) → below 20 m threshold
     controller.add(_fakePosition(base.add(const Duration(seconds: 5)),
         lat: 45.0001, lng: 7.0));
-    // ~55 m north → above threshold and enough time
     controller.add(_fakePosition(base.add(const Duration(seconds: 10)),
         lat: 45.0005, lng: 7.0));
     await Future.delayed(Duration.zero);

@@ -40,12 +40,19 @@ Set<Marker> buildMarkers(
 /// Builds the red trail showing the route the ride's creator has traveled,
 /// so a rider who gets separated from the group can see which road was
 /// taken.
+/// Max points rendered on the map. Older points are dropped so long rides
+/// do not slow the UI or balloon memory.
+const int kMaxTrackPolylinePoints = 500;
+
 Set<Polyline> buildTrackPolyline(List<TrackPoint> points) {
   if (points.length < 2) return {};
+  final capped = points.length > kMaxTrackPolylinePoints
+      ? points.sublist(points.length - kMaxTrackPolylinePoints)
+      : points;
   return {
     Polyline(
       polylineId: const PolylineId('creatorTrack'),
-      points: points.map((p) => LatLng(p.lat, p.lng)).toList(),
+      points: capped.map((p) => LatLng(p.lat, p.lng)).toList(),
       color: Colors.redAccent,
       width: 4,
     ),

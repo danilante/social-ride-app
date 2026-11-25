@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:social_ride_app/models/ride.dart';
 import 'package:social_ride_app/models/rider_doc.dart';
 import 'package:social_ride_app/models/track_point.dart';
@@ -210,6 +211,7 @@ class _RideScreenState extends State<RideScreen> {
         .throttledPositionStream(
           interval: const Duration(seconds: 10),
           minDistanceMeters: 15,
+          rideCode: widget.rideId,
         )
         .listen(_onPositionUpdate);
   }
@@ -534,6 +536,15 @@ class _RideScreenState extends State<RideScreen> {
     );
   }
 
+  Future<void> _shareRideCode() async {
+    await Share.share(
+      'Unisciti alla mia ride su Social Ride!\n'
+      'Codice: ${widget.rideId}\n'
+      'Apri l\'app, inserisci il codice e partiamo.',
+      subject: 'Codice ride ${widget.rideId}',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -603,6 +614,13 @@ class _RideScreenState extends State<RideScreen> {
                               color: socialRideOrange),
                           tooltip: 'Copia codice',
                           onPressed: _copyRideCode,
+                        ),
+                        IconButton(
+                          key: const Key('shareRideCodeButton'),
+                          icon: const Icon(Icons.share_rounded,
+                              color: socialRideOrange),
+                          tooltip: 'Condividi codice',
+                          onPressed: _shareRideCode,
                         ),
                       ],
                     ),
