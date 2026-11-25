@@ -1,8 +1,11 @@
 const { onDocumentWritten } = require('firebase-functions/v2/firestore');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
+const { getStorage } = require('firebase-admin/storage');
 const { evaluateRider } = require('./dropoff');
+const { cleanupExpiredRides } = require('./cleanup');
 
 initializeApp();
 
@@ -124,3 +127,17 @@ exports.onRiderPositionWritten = onDocumentWritten(
     await handleRiderPositionWritten(getFirestore(), getMessaging(), rideId, userId);
   }
 );
+
+/**
+ * Daily TTL job: delete rides that have been `ended` for more than 24h
+ * (riders + track subcollections, Storage audio, then the ride doc).
+ * Requires the Cloud Scheduler API to be enabled on the Firebase project.
+ */
+exports.cleanupExpiredRides = onSchedule('every 24 hours', async () => {
+  const results = await cleanupExpiredRides(getFirestore(), getStorage());
+  console.log(
+    `cleanupExpiredRides: removed ${results.length} ride(s)`,
+    results.map((r) => r.rideId).join(', ')
+  );
+  return results;
+});

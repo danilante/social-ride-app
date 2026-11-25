@@ -80,11 +80,14 @@ class RideRepository {
   /// Ends the ride for everyone (creator-only in the UI; also enforced by
   /// firestore.rules). Riders still viewing it get kicked back to the home
   /// screen by RideScreen's status listener.
+  ///
+  /// Sets [endedAt] so the scheduled Cloud Function can TTL-delete the ride
+  /// (and its subcollections / Storage audio) after 24 hours.
   Future<void> endRide(String rideId) {
-    return firestore
-        .collection('rides')
-        .doc(rideId)
-        .set({'status': 'ended'}, SetOptions(merge: true));
+    return firestore.collection('rides').doc(rideId).set({
+      'status': 'ended',
+      'endedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   /// Removes the current user from the ride's rider list without affecting

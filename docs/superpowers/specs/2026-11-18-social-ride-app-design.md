@@ -45,14 +45,17 @@ sviluppo mobile.
 rides/{rideId}
   name: string
   creatorId: string
-  status: "active" | "closed"
+  status: "active" | "ended"
   createdAt: timestamp
+  endedAt: timestamp (set when status becomes "ended"; used by TTL cleanup)
   dropoffThresholdMeters: number (default 300)
+  dropoffDwellSeconds: number (default 60)
 
 rides/{rideId}/riders/{userId}
   displayName: string
-  lastPosition: { lat, lng, timestamp }
+  lat, lng, positionUpdatedAt
   state: "in_group" | "dropped_off"
+  distanceFromGroupMeters, thresholdExceededSince, fcmToken, dropoffAudioUrl
 
 rides/{rideId}/messages/{messageId}
   senderId: string
