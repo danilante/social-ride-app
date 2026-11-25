@@ -231,3 +231,63 @@ test('sends an empty dropoffAudioUrl when the dropped-off rider has none set',
 
     assert.strictEqual(sent[0].data.dropoffAudioUrl, '');
   });
+
+test('skips write-back when distance drifts by less than epsilon and state is stable',
+  async () => {
+    // ~50m away (under 300m default). Previous distance was 48m → drift of 2m
+    // is below DISTANCE_EPSILON_METERS (10). State and thresholdSince unchanged.
+    const now = Date.now();
+    const writes = [];
+    const sent = [];
+    const db = fakeDb({
+      ride: {},
+      riders: {
+        me: {
+          lat: 0.00045,
+          lng: 0,
+          state: 'in_group',
+          distanceFromGroupMeters: 48,
+          thresholdExceededSince: null,
+          displayName: 'Mario',
+        },
+        other1: { lat: 0, lng: 0, state: 'in_group', fcmToken: 'tok1' },
+      },
+      writes,
+    });
+
+    await handleRiderPositionWritten(db, fakeMessaging(sent), 'ride1', 'me');
+
+    assert.strictEqual(writes.length, 0);
+    assert.strictEqual(sent.length, 0);
+  });
+
+test('writes when distance changes by more than epsilon even if state is stable',
+  async () => {
+    // Previous distance 50m, new ~150m (still under 300m default) → should write
+    // the updated distance so the UI can show it, but no push.
+    const now = Date.now();
+    const writes = [];
+    const sent = [];
+    const db = fakeDb({
+      ride: {},
+      riders: {
+        me: {
+          lat: 0.00135,
+          lng: 0,
+          state: 'in_group',
+          distanceFromGroupMeters: 50,
+          thresholdExceededSince: null,
+          displayName: 'Mario',
+        },
+        other1: { lat: 0, lng: 0, state: 'in_group', fcmToken: 'tok1' },
+      },
+      writes,
+    });
+
+    await handleRiderPositionWritten(db, fakeMessaging(sent), 'ride1', 'me');
+
+    assert.strictEqual(writes.length, 1);
+    assert.strictEqual(writes[0].data.state, 'in_group');
+    assert.ok(writes[0].data.distanceFromGroupMeters > 100);
+    assert.strictEqual(sent.length, 0);
+  });

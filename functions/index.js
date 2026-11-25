@@ -14,8 +14,19 @@ const MAX_THRESHOLD_METERS = 1000;
 const MIN_DWELL_SECONDS = 10;
 const MAX_DWELL_SECONDS = 300;
 
+// Ignore tiny GPS noise / floating-point drift. Only write distance (and
+// re-trigger downstream) when the change is meaningful. This cuts the
+// majority of write-backs that previously happened on every 10s update.
+const DISTANCE_EPSILON_METERS = 10;
+
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+
+function distanceChangedMeaningfully(prev, next) {
+  if (prev == null && next == null) return false;
+  if (prev == null || next == null) return true;
+  return Math.abs(prev - next) >= DISTANCE_EPSILON_METERS;
 }
 
 async function handleRiderPositionWritten(db, messaging, rideId, userId) {
@@ -51,12 +62,18 @@ async function handleRiderPositionWritten(db, messaging, rideId, userId) {
     }
     const result = evaluateRider(...args);
 
-    const unchanged =
-      result.state === previousState &&
-      result.distanceFromGroupMeters === rider.distanceFromGroupMeters &&
-      result.thresholdExceededSince === (rider.thresholdExceededSince ?? null);
+    const stateChanged = result.state !== previousState;
+    const thresholdSinceChanged =
+      result.thresholdExceededSince !== (rider.thresholdExceededSince ?? null);
+    const distanceMeaningfullyChanged = distanceChangedMeaningfully(
+      rider.distanceFromGroupMeters,
+      result.distanceFromGroupMeters
+    );
 
-    if (!unchanged) {
+    // Only write when something the UI or future evaluations care about
+    // actually changed. Avoids the previous almost-always-write behaviour
+    // caused by floating-point distance noise on every position update.
+    if (stateChanged || thresholdSinceChanged || distanceMeaningfullyChanged) {
       await db
           .collection('rides')
           .doc(rideId)
@@ -72,7 +89,7 @@ async function handleRiderPositionWritten(db, messaging, rideId, userId) {
           );
     }
 
-    if (result.state !== previousState) {
+    if (stateChanged) {
       const tokens = others.map((r) => r.fcmToken).filter(Boolean);
       if (tokens.length > 0) {
         const title =
@@ -98,6 +115,7 @@ async function handleRiderPositionWritten(db, messaging, rideId, userId) {
 }
 
 exports.handleRiderPositionWritten = handleRiderPositionWritten;
+exports.DISTANCE_EPSILON_METERS = DISTANCE_EPSILON_METERS;
 
 exports.onRiderPositionWritten = onDocumentWritten(
   'rides/{rideId}/riders/{userId}',

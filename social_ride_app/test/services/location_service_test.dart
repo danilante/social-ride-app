@@ -56,7 +56,10 @@ void main() {
 
     final emitted = <Position>[];
     final subscription = service
-        .throttledPositionStream(interval: const Duration(seconds: 10))
+        .throttledPositionStream(
+          interval: const Duration(seconds: 10),
+          minDistanceMeters: 0, // disable distance filter for this test
+        )
         .listen(emitted.add);
 
     final base = DateTime(2026, 1, 1, 12, 0, 0);
@@ -69,6 +72,40 @@ void main() {
     expect(emitted.length, 2);
     expect(emitted[0].timestamp, base);
     expect(emitted[1].timestamp, base.add(const Duration(seconds: 11)));
+
+    await subscription.cancel();
+    await controller.close();
+  });
+
+  test('throttledPositionStream skips points that moved less than minDistanceMeters',
+      () async {
+    final controller = StreamController<Position>();
+    final service = LocationService(
+      positionStreamFactory: () => controller.stream,
+    );
+
+    final emitted = <Position>[];
+    final subscription = service
+        .throttledPositionStream(
+          interval: const Duration(seconds: 1),
+          minDistanceMeters: 20,
+        )
+        .listen(emitted.add);
+
+    final base = DateTime(2026, 1, 1, 12, 0, 0);
+    // First point always emitted
+    controller.add(_fakePosition(base, lat: 45.0, lng: 7.0));
+    // ~11 m north (~0.0001 deg lat) → below 20 m threshold
+    controller.add(_fakePosition(base.add(const Duration(seconds: 5)),
+        lat: 45.0001, lng: 7.0));
+    // ~55 m north → above threshold and enough time
+    controller.add(_fakePosition(base.add(const Duration(seconds: 10)),
+        lat: 45.0005, lng: 7.0));
+    await Future.delayed(Duration.zero);
+
+    expect(emitted.length, 2);
+    expect(emitted[0].latitude, 45.0);
+    expect(emitted[1].latitude, 45.0005);
 
     await subscription.cancel();
     await controller.close();

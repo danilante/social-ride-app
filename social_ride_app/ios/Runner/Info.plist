@@ -28,6 +28,14 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Social Ride usa la tua posizione per mostrarti sulla mappa del gruppo e avvisare se ti stacchi.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Social Ride ha bisogno della posizione anche in background per continuare a condividere la tua posizione con il gruppo mentre pedali.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Social Ride ha bisogno della posizione anche in background per continuare a condividere la tua posizione con il gruppo mentre pedali.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Social Ride usa il microfono per registrare il tuo audio personalizzato di allontanamento.</string>
 	<key>UIApplicationSceneManifest</key>

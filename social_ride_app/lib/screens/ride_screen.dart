@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:social_ride_app/models/ride.dart';
@@ -12,9 +13,11 @@ import 'package:social_ride_app/services/dropoff_alert_speaker.dart';
 import 'package:social_ride_app/services/dropoff_audio_service.dart';
 import 'package:social_ride_app/services/dropoff_recorder.dart';
 import 'package:social_ride_app/services/location_service.dart';
+import 'package:social_ride_app/services/position_queue.dart';
 import 'package:social_ride_app/services/push_service.dart';
 import 'package:social_ride_app/services/ride_repository.dart';
 import 'package:social_ride_app/theme.dart';
+import 'package:social_ride_app/util/geo.dart';
 import 'package:social_ride_app/util/markers.dart';
 
 class RideScreen extends StatefulWidget {
@@ -57,6 +60,15 @@ class _RideScreenState extends State<RideScreen> {
   final Set<String> _generatingMarkerIconKeys = {};
   LatLng? _initialCameraTarget;
   GoogleMapController? _mapController;
+
+  /// Offline buffer: positions that failed to upload are kept here and
+  /// flushed on the next successful write (or periodically).
+  final PositionQueue _offlineQueue = PositionQueue(maxSize: 30);
+
+  /// Last successfully recorded track point (for extra sampling safety).
+  double? _lastTrackLat;
+  double? _lastTrackLng;
+  static const _trackMinDistanceMeters = 20.0;
 
   DropoffAudioService get _audioService =>
       widget.dropoffAudioService ??
@@ -159,13 +171,56 @@ class _RideScreenState extends State<RideScreen> {
       return;
     }
     setState(() => _status = _LocationStatus.sharing);
-    _positionSubscription =
-        widget.locationService.throttledPositionStream().listen((position) {
-      widget.rideRepository
-          .updateMyPosition(widget.rideId, position.latitude, position.longitude);
-      widget.rideRepository
-          .addTrackPoint(widget.rideId, position.latitude, position.longitude);
-    });
+    _positionSubscription = widget.locationService
+        .throttledPositionStream(
+          interval: const Duration(seconds: 10),
+          minDistanceMeters: 15,
+        )
+        .listen(_onPositionUpdate);
+  }
+
+  Future<void> _onPositionUpdate(Position position) async {
+    final lat = position.latitude;
+    final lng = position.longitude;
+
+    // 1. Try to push current position; on failure enqueue for later flush.
+    try {
+      await widget.rideRepository.updateMyPosition(widget.rideId, lat, lng);
+      // Successful write → flush any buffered offline points.
+      await _flushOfflineQueue();
+    } catch (_) {
+      _offlineQueue.enqueue(lat, lng);
+    }
+
+    // 2. Track sampling: only the creator records the trail, and only when
+    //    the rider has moved enough since the last recorded point.
+    final shouldRecordTrack = _lastTrackLat == null ||
+        distanceMeters(_lastTrackLat!, _lastTrackLng!, lat, lng) >=
+            _trackMinDistanceMeters;
+    if (shouldRecordTrack) {
+      try {
+        await widget.rideRepository.addTrackPoint(widget.rideId, lat, lng);
+        _lastTrackLat = lat;
+        _lastTrackLng = lng;
+      } catch (_) {
+        // Track is best-effort; ignore transient failures.
+      }
+    }
+  }
+
+  Future<void> _flushOfflineQueue() async {
+    while (_offlineQueue.isNotEmpty) {
+      final p = _offlineQueue.dequeue();
+      if (p == null) break;
+      try {
+        await widget.rideRepository
+            .updateMyPosition(widget.rideId, p.lat, p.lng);
+      } catch (_) {
+        // Put it back and stop; we'll retry on the next successful write.
+        _offlineQueue.enqueue(p.lat, p.lng);
+        break;
+      }
+    }
   }
 
   @override
